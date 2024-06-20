@@ -7,6 +7,13 @@ import numpy as np
 import re
 import os
 import signal
+from filelock import Timeout, FileLock
+import time
+
+pwd = os.path.dirname(os.path.realpath(__file__))
+with open(os.path.join(pwd, "temp.txt"),"w") as f:
+    f.write("")
+f.close()
 
 def handle_interrupt(signal, frame):
     print("\nReceived Ctrl + C, exiting gracefully")
@@ -14,23 +21,16 @@ def handle_interrupt(signal, frame):
 
 # Function for reading lines from stdin and putting them into the queue
 def read_lines(input_queue):
-    try:
-        #cannot use sys.stdin directly here in the child process
-        for line in open(0):
-            try:
-                input_queue.append(line)
-                #keep the queue small
-                input_queue[:]=input_queue[-400:]
-            except UnicodeDecodeError as e:
-                print(f"UnicodeDecodeError: {e}")
-    except KeyboardInterrupt:
-        process_id = os.getpid()
-        os.kill(process_id, signal.SIGTERM)
-    except EOFError:
-        process_id = os.getpid()
-        os.kill(process_id, signal.SIGTERM)
-    except Exception as e:
-        print(f"Error in read_lines: {e}")
+    while True:
+        try:
+            lock = FileLock(os.path.join(pwd, "temp.lock"), timeout=5)
+            with lock:
+                with open(os.path.join(pwd, "temp.txt"),"r") as f:
+                    input_queue.extend([line.strip() for line in f.readlines()][-10:])
+                    input_queue[:]=input_queue[-200:]
+        except Exception as e:
+            print(f"Error in read_lines: {e}")
+        time.sleep(0.02)
 
 def parse_stdin(line, x_vec, y_vec, z_vec, qw_vec, qx_vec, qy_vec, qz_vec):
     """
@@ -46,7 +46,6 @@ def parse_stdin(line, x_vec, y_vec, z_vec, qw_vec, qx_vec, qy_vec, qz_vec):
         qx_vec.append(int(match.group(5))/float((1 << 14)))
         qy_vec.append(int(match.group(6))/float((1 << 14)))
         qz_vec.append(int(match.group(7))/float((1 << 14)))
-        print(x_vec[-1],y_vec[-1],z_vec[-1])
         return True
     return False
 
