@@ -3,6 +3,8 @@
 #-------------------this only works with flive_plot.py---------------------
 # the normal live_plot.py for some reasong is very laggy working through pipe with BLE
 #python3.10 imu_ble.py | python3.10 flive_plot.py
+#or(for viewing the output of this script)
+#python3.10 imu_ble.py & python3.10 flive_plot.py
 
 # PYTHON INCLUSIONS ---------------------------------------------------------------------------------------------------
 
@@ -15,9 +17,15 @@ from datetime import datetime
 import os
 from filelock import Timeout, FileLock
 import signal
+import traceback
+
+CONNECTION_TIMEOUT=6
+
 # Helper function to handle Ctrl+C
 def handle_interrupt(sig, frame):
     print("\nExiting gracefully...")
+    with open(os.path.join(pwd, "buffer.txt"),"w") as f:
+        f.write("")
     tasks = asyncio.all_tasks(loop)
     for task in tasks:
         task.cancel()
@@ -27,19 +35,26 @@ def handle_interrupt(sig, frame):
 
 IMU_DATA_UUID = 'd68c3158-a23f-ee90-0c45-5231395e5d2e'
 
-
 # STATE VARIABLES -----------------------------------------------------------------------------------------------------
 
 filename_base = datetime.now().strftime('ranging_data_%Y-%m-%d_%H-%M-%S_')
-data_characteristics = []
+data_characteristics = dict()
 ranging_files = []
-tottags = []
+tottags = dict()
+
 pwd = os.path.dirname(os.path.realpath(__file__))
+#create the lock file if it does not exist
+if not os.path.exists(os.path.join(pwd, "buffer.lock")):
+    # Create the file
+    with open(os.path.join(pwd, "buffer.lock"), "w") as f:
+        f.write("")
+with open(os.path.join(pwd, "buffer.txt"),"w") as f:
+    f.write("")
 
 # HELPER FUNCTIONS AND CALLBACKS --------------------------------------------------------------------------------------
 
-def data_received_callback(sender_characteristic, data):
-    print("ble data callback")
+def data_received_callback(address, sender_characteristic, data):
+    print("ble data callback",address)
     if not hasattr(data_received_callback, "count"):
         data_received_callback.count = 0  # Initialize the static variable
     data_received_callback.count+=1
@@ -54,20 +69,40 @@ def data_received_callback(sender_characteristic, data):
     calib_gyro = (reg_value >> 4) & 0x03
     calib_sys = (reg_value >> 6) & 0x03
 
-    lock = FileLock(os.path.join(pwd, "temp.lock"), timeout=5)
+    lock = FileLock(os.path.join(pwd, "buffer.lock"), timeout=5)
     with lock:
         #wipe the buffer file so that it does not grow too huge
         if data_received_callback.count==100:
-            with open(os.path.join(pwd, "temp.txt"),"w") as f:
+            with open(os.path.join(pwd, "buffer.txt"),"w") as f:
                 f.write("")
             #reset the counter
             data_received_callback.count==0
         #append data to the buffer file
-        with open(os.path.join(pwd, "temp.txt"),"a") as f:
-            f.write(f"Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag}\n")
-            f.write(f"Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
+        with open(os.path.join(pwd, "buffer.txt"),"a") as f:
+            #f.write(f"Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag}\n")
+            f.write(f"Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
    #  data_file.write('{}\t{}    {}    {}\n'.format(timestamp, hex(from_eui)[2:], hex(to_eui)[2:], range_mm))
 
+async def connect_to_device(address):
+    client = BleakClient(address, use_cached=False)
+    data_characteristics[address]=[]
+    await client.connect()
+    for service in await client.get_services():
+        for characteristic in service.characteristics:
+
+          # Open a log file, register for data notifications, and add this TotTag to the list of valid devices
+          if characteristic.uuid == IMU_DATA_UUID:
+            #try:
+            #  file = open(filename_base + client.address.replace(':', '') + '.data', 'w')
+            #  file.write('Timestamp\tFrom  To    Distance (mm)\n')
+            #except Exception as e:
+            #  print(e)
+            #  print('ERROR: Unable to create a ranging data log file')
+            #  sys.exit('Unable to create a ranging data log file: Cannot continue!')
+            await client.start_notify(characteristic, functools.partial(data_received_callback,address))
+            #tottags.append([client,device])
+            tottags[address]=client
+            data_characteristics[address].append(characteristic)
 
 # MAIN IMU DATA LOGGING FUNCTION -----------------------------------------------------------------------------------------
 
@@ -82,37 +117,30 @@ async def log_imu_data():
   # Iterate through all discovered TotTag devices
   for device in scanner.discovered_devices:
     if device.name == 'TotTag':
-
       # Connect to the specified TotTag and locate the ranging data service
       print('Found Device: {}'.format(device.address))
-      client = BleakClient(device, use_cached=False)
       try:
-        await client.connect()
-        for service in await client.get_services():
-          for characteristic in service.characteristics:
-
-            # Open a log file, register for data notifications, and add this TotTag to the list of valid devices
-            if characteristic.uuid == IMU_DATA_UUID:
-              #try:
-              #  file = open(filename_base + client.address.replace(':', '') + '.data', 'w')
-              #  file.write('Timestamp\tFrom  To    Distance (mm)\n')
-              #except Exception as e:
-              #  print(e)
-              #  print('ERROR: Unable to create a ranging data log file')
-              #  sys.exit('Unable to create a ranging data log file: Cannot continue!')
-              await client.start_notify(characteristic, functools.partial(data_received_callback))
-              data_characteristics.append(characteristic)
-              tottags.append([client,device])
-
+          await asyncio.wait_for(connect_to_device(device.address), timeout=CONNECTION_TIMEOUT)
       except Exception as e:
         print('ERROR: Unable to connect to TotTag {}'.format(device.address))
+        traceback.print_exc()
         await client.disconnect()
 
   # Wait forever while ranging data is being logged
   while True:
-      for client, device in tottags:
+      print(data_characteristics)
+      for device_address in tottags:
+          client = tottags[device_address]
           if not client.is_connected:
               print(f"{device.address} client disconected!")
+              #re-connect
+              try:
+                  await connect_to_device(device_address)
+              except Exception as e:
+                print('ERROR: Unable to connect to TotTag {}'.format(device.address))
+                traceback.print_exc()
+                await client.disconnect()
+
       await asyncio.sleep(1)
 
   # Disconnect from all TotTag devices
@@ -121,7 +149,6 @@ async def log_imu_data():
     await tottags[i].disconnect()
 
 # TOP-LEVEL FUNCTIONALITY ---------------------------------------------------------------------------------------------
-
 signal.signal(signal.SIGINT, handle_interrupt)
 
 print('\nSearching 6 seconds for TotTags...\n')

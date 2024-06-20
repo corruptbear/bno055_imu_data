@@ -11,21 +11,20 @@ from filelock import Timeout, FileLock
 import time
 
 pwd = os.path.dirname(os.path.realpath(__file__))
-with open(os.path.join(pwd, "temp.txt"),"w") as f:
-    f.write("")
-f.close()
 
 def handle_interrupt(signal, frame):
     print("\nReceived Ctrl + C, exiting gracefully")
+    with open(os.path.join(pwd, "buffer.txt"),"w") as f:
+        f.write("")
     sys.exit(0)
 
 # Function for reading lines from stdin and putting them into the queue
 def read_lines(input_queue):
     while True:
         try:
-            lock = FileLock(os.path.join(pwd, "temp.lock"), timeout=5)
+            lock = FileLock(os.path.join(pwd, "buffer.lock"), timeout=5)
             with lock:
-                with open(os.path.join(pwd, "temp.txt"),"r") as f:
+                with open(os.path.join(pwd, "buffer.txt"),"r") as f:
                     input_queue.extend([line.strip() for line in f.readlines()][-10:])
                     input_queue[:]=input_queue[-200:]
         except Exception as e:
@@ -37,21 +36,21 @@ def parse_stdin(line, x_vec, y_vec, z_vec, qw_vec, qx_vec, qy_vec, qz_vec):
     Parses acc in m/s^2, quaternions in quaternion unit
     """
     pattern = re.compile(r'Linear Accel X = (-?\d+), Y = (-?\d+), Z = (-?\d+), qw = (-?\d+), qx = (-?\d+), qy = (-?\d+), qz = (-?\d+)')
-    match = pattern.match(line)
+    match = pattern.search(line) #use search instead of match because for match the pattern has to be at the start of the line
     if match:
-        x_vec.append(int(match.group(1))/100.0)
-        y_vec.append(int(match.group(2))/100.0)
-        z_vec.append(int(match.group(3))/100.0)
-        qw_vec.append(int(match.group(4))/float((1 << 14)))
-        qx_vec.append(int(match.group(5))/float((1 << 14)))
-        qy_vec.append(int(match.group(6))/float((1 << 14)))
-        qz_vec.append(int(match.group(7))/float((1 << 14)))
+        x_vec.append(int(match.group(1)) / 100.0)
+        y_vec.append(int(match.group(2)) / 100.0)
+        z_vec.append(int(match.group(3)) / 100.0)
+        qw_vec.append(int(match.group(4)) / float((1 << 14)))
+        qx_vec.append(int(match.group(5)) / float((1 << 14)))
+        qy_vec.append(int(match.group(6)) / float((1 << 14)))
+        qz_vec.append(int(match.group(7)) / float((1 << 14)))
         return True
     return False
 
 def parse_calib(line):
     pattern = re.compile(r'Calibration status: sys (-?\d+), gyro (-?\d+), accel (-?\d+), mag (-?\d+)')
-    match = pattern.match(line)
+    match = pattern.search(line) #use search instead of match because for match the pattern has to be at the start of the line
     if match:
         sys = int(match.group(1))
         gyro = int(match.group(2))
@@ -62,11 +61,11 @@ def parse_calib(line):
 
 def parse_gyro(line, gx_vec, gy_vec, gz_vec):
     pattern = re.compile(r'gx = (-?\d+), gy = (-?\d+), gz = (-?\d+)')
-    matches = re.findall(pattern, line)
-    if len(matches)>0:
-        gx_vec.append(int(matches[0][0])/16.0)
-        gy_vec.append(int(matches[0][1])/16.0)
-        gz_vec.append(int(matches[0][2])/16.0)
+    match = pattern.search(line) #use search instead of match because for match the pattern has to be at the start of the line
+    if match:
+        gx_vec.append(int(match.group(1))/16.0)
+        gy_vec.append(int(match.group(2))/16.0)
+        gz_vec.append(int(match.group(3))/16.0)
         return True
     return False
 
@@ -184,7 +183,7 @@ def animate(i, input_queue, x_vec,y_vec,z_vec,qw_vec,qx_vec,qy_vec,qz_vec, yaw_v
     ax3.plot(projected_y_vec, label="world_acc_y")
     ax3.plot(projected_z_vec, label="world_acc_z")
     ax3.set_xlim(0, window_size)
-    ax3.set_ylim(-3,3)
+    ax3.set_ylim(-20,20)
     ax3.legend(loc='upper right')
 
     fig.suptitle(status)
