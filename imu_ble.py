@@ -54,10 +54,8 @@ with open(os.path.join(pwd, "buffer.txt"),"w") as f:
 # HELPER FUNCTIONS AND CALLBACKS --------------------------------------------------------------------------------------
 
 def data_received_callback(address, sender_characteristic, data):
-    print("ble data callback",address)
-    if not hasattr(data_received_callback, "count"):
-        data_received_callback.count = 0  # Initialize the static variable
-    data_received_callback.count+=1
+    global data_received_callback_count
+    #print("ble data callback",address)
 
     #this unpacked data from burst reading
     gx,gy,gz = struct.unpack('<3h',data[:6])
@@ -72,16 +70,17 @@ def data_received_callback(address, sender_characteristic, data):
     lock = FileLock(os.path.join(pwd, "buffer.lock"), timeout=5)
     with lock:
         #wipe the buffer file so that it does not grow too huge
-        if data_received_callback.count==100:
+        if data_received_callback_count>=200:
+            #reset the counter
+            data_received_callback_count=0
             with open(os.path.join(pwd, "buffer.txt"),"w") as f:
                 f.write("")
-            #reset the counter
-            data_received_callback.count==0
         #append data to the buffer file
         with open(os.path.join(pwd, "buffer.txt"),"a") as f:
             #f.write(f"Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag}\n")
-            f.write(f"Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
-   #  data_file.write('{}\t{}    {}    {}\n'.format(timestamp, hex(from_eui)[2:], hex(to_eui)[2:], range_mm))
+            f.write(f"{address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
+    #  data_file.write('{}\t{}    {}    {}\n'.format(timestamp, hex(from_eui)[2:], hex(to_eui)[2:], range_mm))
+    data_received_callback_count+=1
 
 async def connect_to_device(address):
     client = BleakClient(address, use_cached=False)
@@ -149,15 +148,17 @@ async def log_imu_data():
     await tottags[i].disconnect()
 
 # TOP-LEVEL FUNCTIONALITY ---------------------------------------------------------------------------------------------
-signal.signal(signal.SIGINT, handle_interrupt)
+if __name__ == "__main__":
+    signal.signal(signal.SIGINT, handle_interrupt)
+    data_received_callback_count = 0
 
-print('\nSearching 6 seconds for TotTags...\n')
-loop = asyncio.get_event_loop()
+    print('\nSearching 6 seconds for TotTags...\n')
+    loop = asyncio.get_event_loop()
 
-# Listen forever for TotTag ranges
-try:
-  loop.run_until_complete(log_imu_data())
+    # Listen forever for TotTag ranges
+    try:
+      loop.run_until_complete(log_imu_data())
 
-# Gracefully close all log files
-finally:
-  loop.close()
+    # Gracefully close all log files
+    finally:
+      loop.close()
