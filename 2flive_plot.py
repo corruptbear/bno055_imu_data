@@ -133,19 +133,19 @@ def animate(i, addr, input_queue):
     if len(input_queue)==0:
         return
     #getting the latest status line
-    for line1 in reversed(input_queue):
-        if status:=parse_calib(addr, line1):
-            print(addr, line1)
+    for line in reversed(input_queue):
+        if status:=parse_calib(addr, line):
+            print(addr, line)
             break
     #getting the latest output line
-    for line2 in reversed(input_queue):
-        if parse_stdin(addr, line2):
-            print(addr, line2)
+    for line in reversed(input_queue):
+        if parse_stdin(addr, line):
+            #print(addr, line)
             break
     #getting the latest output line
-    for line3 in reversed(input_queue):
-        if parse_gyro(addr, line3):
-            print(addr, line3)
+    for line in reversed(input_queue):
+        if parse_gyro(addr, line):
+            #print(addr, line)
             break
 
     #skip if nothing is ready yet
