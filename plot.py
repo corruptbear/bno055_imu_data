@@ -216,7 +216,7 @@ print(rotation_matrix_from_quaternion(0.9659,0.2588,0,0))
 
 #calibrated_linear_50HZ.txt: back and forth; largely linear
 #calibrated_static_50HZ.txt: highlights drifting
-x_vec,y_vec,z_vec,qw_vec,qx_vec,qy_vec,qz_vec = parse_linear_acc_quaternion_log(path.join(pwd,"calibrated_linear_50HZ.txt"))
+x_vec,y_vec,z_vec,qw_vec,qx_vec,qy_vec,qz_vec = parse_linear_acc_quaternion_log(path.join(pwd,"logs/calibrated_linear_50HZ.txt"))
 #x_vec,y_vec,z_vec,qw_vec,qx_vec,qy_vec,qz_vec = parse_linear_acc_quaternion_log(path.join(pwd,"calibrated_static_50HZ.txt"))
 reconstruct_pos_double_int_linear_acc_quaternion(x_vec,y_vec,z_vec,qw_vec,qx_vec,qy_vec,qz_vec, sampling_rate = 50)
 
