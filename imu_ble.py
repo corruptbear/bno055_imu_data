@@ -57,7 +57,6 @@ with open(os.path.join(pwd, "buffer.txt"),"w") as f:
 def data_received_callback(address, uuid, sender_characteristic, data):
     global imu_data_received_callback_count
     #print("ble data callback",address,uuid)
-
     if uuid == IMU_DATA_UUID:
         #this unpacked data from burst reading
         gx,gy,gz = struct.unpack('<3h',data[:6])
@@ -68,6 +67,7 @@ def data_received_callback(address, uuid, sender_characteristic, data):
         calib_accel = (reg_value >> 2) & 0x03
         calib_gyro = (reg_value >> 4) & 0x03
         calib_sys = (reg_value >> 6) & 0x03
+        #print(f"{address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
 
         lock = FileLock(os.path.join(pwd, "buffer.lock"), timeout=5)
         with lock:
@@ -93,18 +93,23 @@ def data_received_callback(address, uuid, sender_characteristic, data):
 async def connect_to_device(address):
     client = BleakClient(address, use_cached=False)
     data_characteristics[address]=dict()
-    await client.connect()
-    for service in await client.get_services():
-        for characteristic in service.characteristics:
+    try:
+        await client.connect()
+        for service in await client.get_services():
+            for characteristic in service.characteristics:
 
-          # Open a log file, register for data notifications, and add this TotTag to the list of valid devices
-          if characteristic.uuid == IMU_DATA_UUID:
-            await client.start_notify(characteristic, functools.partial(data_received_callback,address,characteristic.uuid))
-            tottags[address]=client
-            data_characteristics[address][characteristic.uuid]=characteristic
+              # Open a log file, register for data notifications, and add this TotTag to the list of valid devices
+              if characteristic.uuid == IMU_DATA_UUID:
+                await client.start_notify(characteristic, functools.partial(data_received_callback,address,characteristic.uuid))
+                tottags[address]=client
+                data_characteristics[address][characteristic.uuid]=characteristic
 
-          if characteristic.uuid == RANGING_DATA_UUID:
-            await client.start_notify(characteristic, functools.partial(data_received_callback,address,characteristic.uuid))
+              #if characteristic.uuid == RANGING_DATA_UUID:
+              #  await client.start_notify(characteristic, functools.partial(data_received_callback,address,characteristic.uuid))
+    except Exception as e:
+        print('ERROR: Unable to connect to TotTag {}'.format(device.address))
+        traceback.print_exc()
+        await client.disconnect()
 
 # MAIN IMU DATA LOGGING FUNCTION -----------------------------------------------------------------------------------------
 
@@ -121,12 +126,7 @@ async def log_imu_data():
     if device.name == 'TotTag':
       # Connect to the specified TotTag and locate the ranging data service
       print('Found Device: {}'.format(device.address))
-      try:
-          await asyncio.wait_for(connect_to_device(device.address), timeout=CONNECTION_TIMEOUT)
-      except Exception as e:
-        print('ERROR: Unable to connect to TotTag {}'.format(device.address))
-        traceback.print_exc()
-        await client.disconnect()
+      await asyncio.wait_for(connect_to_device(device.address), timeout=CONNECTION_TIMEOUT)
 
   # Wait forever while ranging data is being logged
   while True:
@@ -136,12 +136,7 @@ async def log_imu_data():
           if not client.is_connected:
               print(f"{device.address} client disconected!")
               #re-connect
-              try:
-                  await connect_to_device(device_address)
-              except Exception as e:
-                print('ERROR: Unable to connect to TotTag {}'.format(device.address))
-                traceback.print_exc()
-                await client.disconnect()
+              await connect_to_device(device_address)
 
       await asyncio.sleep(1)
 

@@ -31,12 +31,6 @@ def read_lines(input_queue):
             print(f"Error in read_lines: {e}")
         time.sleep(0.02)
 
-def parse_addr(addr, line):
-    pattern = re.compile(r'[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}', re.IGNORECASE)
-    if pattern.search(line):
-        return True
-    return False
-
 def parse_stdin(addr, line):
     """
     Parses acc in m/s^2, quaternions in quaternion unit
