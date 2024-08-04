@@ -5,6 +5,7 @@ from matplotlib.patches import Patch
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import Tk, Frame, filedialog, Radiobutton, StringVar, Button, OptionMenu
 import tkinter as tk
+from load_imu_data import formats
 
 dpi = 300
 base_dpi = 200
@@ -179,9 +180,30 @@ class DraggableIntervals:
         self.ax.figure.canvas.draw()
 
     def on_button_press(self):
+        """
+        export button
+        """
+        # TODO: save label
+        # create empty array of the same shape
+        save  = np.empty((0, self.data.shape[1]),dtype=object)
+        # the column for labels (add as the last column)
+        labels = []
         for patch in self.interval_patches:
-            print(patch['label'], patch['patch'].get_xy()[0][0], patch['patch'].get_xy()[2][0])
+            start_timestamp, end_timestamp = patch['patch'].get_xy()[0][0], patch['patch'].get_xy()[2][0]
+            print(patch['label'], start_timestamp, end_timestamp)
+            selected = [self.data[k,:] for k in range(len(self.data)) if self.data[k][0]>=start_timestamp and  self.data[k][0]<=end_timestamp]
+            labels = labels + [patch['label']]*len(selected)
+            save = np.vstack([save, selected])
+    
+        new_column = np.array(labels).reshape(-1,1)
 
+        # Add the new column
+        save = np.hstack([save, new_column])
+        new_headers = ','.join(headers+["label"])
+        new_fmt = formats+["%s"]
+
+        np.savetxt(f"./test.csv", save, delimiter=',', header=new_headers, comments='', fmt=new_fmt)
+ 
     def load_file(self):
         file_path = filedialog.askopenfilename(filetypes=[('Text Files', '*.txt')])
         if file_path:
@@ -245,6 +267,7 @@ if __name__ == "__main__":
     all_data = df.values
     headers = df.columns.tolist()
 
+    # set the start to 0
     all_data[:, 0] = all_data[:, 0] - all_data[0][0]
     timestamps = all_data[:, 0]
     column_index = 5  # Default column index
