@@ -29,3 +29,14 @@ Same as above, more data, a full run
 
 0_mix1.pkl
 doremi_acc  yankee120 (padding 8)  doremi_acc
+
+
+0_k265_device59.pkl
+data_types = [STAT_DATA,LACC_DATA,GYRO_DATA, QUAT_DATA]
+fusion: NDOF
+Music: K265_cutmore_padded_120_drum_added_overlay.mp3
+note: naked device 
+
+0_k265_device36.pkl
+Same as above;  recorded at the same time
+

@@ -67,7 +67,7 @@ def data_received_callback(address, uuid, sender_characteristic, data):
         calib_accel = (reg_value >> 2) & 0x03
         calib_gyro = (reg_value >> 4) & 0x03
         calib_sys = (reg_value >> 6) & 0x03
-        print(f"{address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
+        #print(f"{address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
 
         lock = FileLock(os.path.join(pwd, "buffer.lock"), timeout=5)
         with lock:

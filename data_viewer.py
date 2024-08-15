@@ -156,7 +156,7 @@ intervals = [('get_ready', 0.0, 4.8), ('moving', 4.8, 7.2), ('stop', 7.2, 9.6), 
 intervals = [(x, y, z) for (x, y, z) in intervals if "ready" not in x]
 
 # Read the CSV file into a DataFrame
-df = pd.read_csv("./pkls/0_mix1.csv")
+df = pd.read_csv("./pkls/0_k265_device59.csv")
 # Convert the DataFrame to a 2D NumPy array
 all_data = df.values
 # Get the headers (column names)
