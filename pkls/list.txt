@@ -31,6 +31,10 @@ Same as above, more data, a full run
 doremi_acc  yankee120 (padding 8)  doremi_acc
 
 
+
+
+
+
 0_k265_device59.pkl
 data_types = [STAT_DATA,LACC_DATA,GYRO_DATA, QUAT_DATA]
 fusion: NDOF
@@ -39,4 +43,10 @@ note: naked device
 
 0_k265_device36.pkl
 Same as above;  recorded at the same time
+
+0_k265_device59_2.pkl 0_k265_device36_2.pkl
+Same as above; recorded at the same time; 59 in right pocket; 36 in left pocket
+
+0_k265_device59_3.pkl 0_k265_device36_3.pkl
+Music: K265_cutmore_padded_130_drum_added_overlay.mp3
 

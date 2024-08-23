@@ -5,7 +5,23 @@ from matplotlib.patches import Patch
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import Tk, Frame, filedialog, Radiobutton, StringVar, Button, OptionMenu
 import tkinter as tk
+from tkinter import messagebox
 from load_imu_data import formats
+import os
+import yaml
+
+def save_yaml(dictionary,filepath,write_mode):
+    with open(filepath,write_mode) as f:
+        yaml.dump(dictionary,f)
+
+def load_yaml(filepath):
+    try:
+        with open(filepath,'r') as stream:
+            dictionary = yaml.safe_load(stream)
+            return dictionary
+    except:
+        return dict()
+
 
 dpi = 300
 base_dpi = 200
@@ -29,17 +45,38 @@ plt.rcParams.update({
 })
 
 class DraggableIntervals:
-    def __init__(self, master, interval_name, headers, data, column_index):
+    def __init__(self, master, interval_name, csv=None):
         self.master = master
         self.fig, (self.ax, self.zoom_ax) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 2]}, figsize=(8, 6), dpi=300)
         plt.subplots_adjust(bottom=0.1, hspace=0.4)
         print("figure DPI",self.fig.get_dpi())
+        self.csv_path = csv
+        base, ext = os.path.splitext(self.csv_path)
+        self.alignment_path = base + '_alignment.yaml'
+
+        self.load_alignments()
+        print(type(self.alignments))
+        print(self.alignments)
+
+        self.interval_name = interval_name
+        
+        # Read the CSV file into a DataFrame
+        #df = pd.read_csv("./pkls/0_mix1.csv")
+        df = pd.read_csv(csv)
+    
+        all_data = df.values
+        headers = df.columns.tolist()
+
+        # set the start to 0
+        all_data[:, 0] = all_data[:, 0] - all_data[0][0]
+        self.timestamps = all_data[:, 0]
+        column_index = 5  # Default column index
 
         # Set font sizes and DPI
         self.set_font_sizes(dpi=300)  # Default DPI
 
         self.headers = headers
-        self.data = data
+        self.data = all_data
         self.column_index = column_index
         self.press = None
         self.offsets = []
@@ -47,7 +84,7 @@ class DraggableIntervals:
         self.label_to_color = {}
 
         # Plot initial data
-        self.line_A, = self.ax.plot(data[:, 0], data[:, column_index], label='Time Series A')
+        self.full_plot, = self.ax.plot(self.data[:, 0], self.data[:, column_index], label='Time Series A')
 
         # Initialize zoom plot
         self.zoom_line, = self.zoom_ax.plot([], [], 'r-')
@@ -59,12 +96,17 @@ class DraggableIntervals:
         self.button_frame = Frame(self.master)
         self.button_frame.pack(side='bottom', fill='x')
 
-        # Add Tkinter Buttons
+        # print button
         self.print_button = Button(self.button_frame, text='Print A', command=self.on_button_press)
         self.print_button.pack(side='left', padx=5)
 
+        # load file button
         self.load_button = Button(self.button_frame, text='Load File', command=self.load_file)
         self.load_button.pack(side='left', padx=5)
+        
+        # Add Tkinter Button for saving alignment
+        self.save_alignment_button = Button(self.button_frame, text='Save Alignment', command=self.save_alignment)
+        self.save_alignment_button.pack(side='left', padx=5)
 
         # Add Tkinter RadioButtons
         self.radio_var = StringVar(value=headers[column_index])
@@ -85,8 +127,56 @@ class DraggableIntervals:
         self.dropdown_var.trace("w", self.on_dropdown_change)
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
-        self.load_color_patches(interval_name)
+
+        offset = 0
+        if self.interval_name in self.alignments:
+            offset = self.alignments[self.interval_name]
+        self.load_color_patches(interval_name, offset = offset)
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
+
+    def load_alignments(self):
+        """
+        load the saved alignments for songs
+        """
+        self.alignments = load_yaml(self.alignment_path)
+
+    def save_alignment(self):
+        """
+        Save alignment with handling for duplicated keys
+
+        Save one at a time
+        """
+        print("Save alignments to:", self.alignment_path)
+        patch = self.interval_patches[0]
+        # current position minus the original position (not necessary 0 because we remove ready patches)
+        offset = float(patch['patch'].get_xy()[0][0])  - float(patch['limits'][0])
+
+        if self.interval_name in self.alignments:
+            # Ask user if they want to override or save as a new value
+            result = messagebox.askquestion(
+                "Overwrite or Save As New",
+                f"The key '{self.interval_name}' already exists. Do you want to overwrite it or save as a new key?"
+                "\n\nChoose 'Yes' to overwrite or 'No' to save as a new key.",
+                icon='warning'
+            )
+            if result == 'yes':
+                # Overwrite existing key
+                self.alignments[self.interval_name] = offset
+            else:
+                # Save as a new unique key
+                new_key = self.interval_name
+                counter = 1
+                while new_key in self.alignments:
+                    new_key = f"{self.interval_name}_{counter}"
+                    counter += 1
+                self.alignments[new_key] = offset
+        else:
+            # Key does not exist, simply add it
+            self.alignments[self.interval_name] = offset
+
+        print(self.alignments)
+
+        save_yaml(self.alignments, self.alignment_path, 'w')
 
     def set_font_sizes(self, dpi):
         """
@@ -103,12 +193,17 @@ class DraggableIntervals:
                 ax.spines[axis].set_linewidth(plt.rcParams['axes.linewidth'])
 
     def on_dropdown_change(self, *args):
-        selected_value = self.dropdown_var.get()
-        print(f"Selected value from dropdown: {selected_value}")
-        self.load_color_patches(selected_value)
+        selected_interval_name = self.dropdown_var.get()
+        print(f"Selected value from dropdown: {selected_interval_name}")
+        
+        offset = 0
+        if selected_interval_name in self.alignments:
+            offset = self.alignments[selected_interval_name]
+        self.load_color_patches(selected_interval_name, offset = offset)
 
-    def load_color_patches(self, interval_name):
+    def load_color_patches(self, interval_name, offset = 0):
         intervals = [(x, y, z) for (x, y, z) in all_intervals[interval_name] if "ready" not in x]
+        self.interval_name = interval_name
         # Clear the existing patches
         for p in self.interval_patches:
             p["patch"].remove()
@@ -120,8 +215,9 @@ class DraggableIntervals:
             if label not in self.label_to_color:
                 self.label_to_color[label] = colormap(len(self.label_to_color) % colormap.N)
             color = self.label_to_color[label]
-            patch = self.ax.axvspan(start, end, color=color, alpha=0.5, label=label, linewidth=0)
-            self.interval_patches.append({'patch': patch, 'label': label, 'color': color})
+            # apply offset to patches
+            patch = self.ax.axvspan(start+offset, end+offset, color=color, alpha=0.5, label=label, linewidth=0)
+            self.interval_patches.append({'patch': patch, 'label': label, 'color': color, 'limits': (start, end)})
 
         # Add custom patches to the legend
         handles = []
@@ -205,6 +301,9 @@ class DraggableIntervals:
         np.savetxt(f"./test.csv", save, delimiter=',', header=new_headers, comments='', fmt=new_fmt)
  
     def load_file(self):
+        """
+        TODO: this is for test only
+        """
         file_path = filedialog.askopenfilename(filetypes=[('Text Files', '*.txt')])
         if file_path:
             with open(file_path, 'r') as file:
@@ -218,7 +317,7 @@ class DraggableIntervals:
         label = self.radio_var.get()
         self.column_index = self.headers.index(label)
         time_series = self.data[:, self.column_index]
-        self.line_A.set_ydata(time_series)
+        self.full_plot.set_ydata(time_series)
         self.update_zoom(self.ax.get_xlim()[0])
         self.ax.relim()
         self.ax.autoscale_view()
@@ -226,10 +325,10 @@ class DraggableIntervals:
 
     def update_zoom(self, x_center):
         window_size = 100
-        x0 = max(self.interval_patches[0]['patch'].get_xy()[0][0] - 10, timestamps[0])
-        x1 = min(self.interval_patches[-1]['patch'].get_xy()[2][0] + 10, timestamps[-1])
+        x0 = max(self.interval_patches[0]['patch'].get_xy()[0][0] - 10, self.timestamps[0])
+        x1 = min(self.interval_patches[-1]['patch'].get_xy()[2][0] + 10, self.timestamps[-1])
         self.zoom_ax.set_xlim(x0, x1)
-        zoom_data = self.data[(timestamps >= x0) & (timestamps <= x1)]
+        zoom_data = self.data[(self.timestamps >= x0) & (self.timestamps <= x1)]
         self.zoom_line.set_data(zoom_data[:, 0], zoom_data[:, self.column_index])
         self.zoom_ax.relim()
         self.zoom_ax.autoscale_view()
@@ -261,22 +360,11 @@ if __name__ == "__main__":
 
     all_intervals = {"doremi_acc_padded8":[('get_ready', 0.0, 4.8), ('moving', 4.8, 7.2), ('stop', 7.2, 9.6), ('moving', 9.6, 12.0), ('stop', 12.0, 14.4), ('moving', 14.4, 16.8), ('stop', 16.8, 19.2), ('walk', 19.2, 22.8), ('turn_back', 22.8, 24.0), ('walk', 24.0, 27.6), ('turn_back', 27.6, 28.8), ('walk', 28.8, 32.4), ('turn_back', 32.4, 33.6), ('walk', 33.6, 37.2), ('turn_back', 37.2, 38.4), ('walk', 38.4, 42.0), ('turn_back', 42.0, 43.2), ('walk', 43.2, 46.8), ('turn_back', 46.8, 48.0), ('walk', 48.0, 51.6), ('turn_back', 51.6, 52.8), ('walk', 52.8, 56.4), ('turn_back', 56.4, 57.6), ('walk', 57.6, 60.872730000000004), ('turn_back', 60.872730000000004, 61.96364), ('walk', 61.96364, 65.23637000000001), ('turn_back', 65.23637000000001, 66.32728), ('walk', 66.32728, 69.60001), ('turn_back', 69.60001, 70.69092), ('walk', 70.69092, 73.96365), ('turn_back', 73.96365, 75.05456000000001), ('walk', 75.05456000000001, 78.32729), ('turn_back', 78.32729, 79.4182), ('walk', 79.4182, 82.69093000000001), ('turn_back', 82.69093000000001, 83.78184), ('walk', 83.78184, 87.05457), ('turn_back', 87.05457, 88.14548), ('walk', 88.14548, 91.41821), ('turn_back', 91.41821, 92.50912), ('walk', 92.50912, 95.50912), ('turn_back', 95.50912, 96.50912), ('walk', 96.50912, 99.50912), ('turn_back', 99.50912, 100.50912), ('walk', 100.50912, 103.50912), ('turn_back', 103.50912, 104.50912), ('walk', 104.50912, 107.50912), ('turn_back', 107.50912, 108.50912), ('walk', 108.50912, 111.50912), ('turn_back', 111.50912, 112.50912), ('walk', 112.50912, 115.50912), ('turn_back', 115.50912, 116.50912), ('walk', 116.50912, 119.50912), ('turn_back', 119.50912, 120.50912), ('stop', 120.50912, 126.537143)],
                      "Yankee_doodle_Saloon_style_padded8_120":[('get_ready', 0.0, 4.0), ('moving', 4.0, 6.0), ('stop', 6.0, 8.0), ('moving', 8.0, 10.0), ('stop', 10.0, 12.0), ('moving', 12.0, 14.0), ('stop', 14.0, 16.0), ('get_ready_to_walk_forward', 16.0, 20.0), ('walking_forward', 20.0, 36.0), ('get_ready_to_run_forward', 36.0, 40.0), ('running_forward', 40.0, 56.0), ('get_ready_to_walk_forward', 56.0, 60.0), ('walking_forward', 60.0, 76.0), ('get_ready_to_stand_still', 76.0, 80.0), ('standing_still', 80.0, 98.142041)],
-                     "K265_cutmore_padded_120":[('get_ready', 0.0, 4.0), ('moving', 4.0, 6.0), ('stop', 6.0, 8.0), ('moving', 8.0, 10.0), ('stop', 10.0, 12.0), ('moving', 12.0, 14.0), ('stop', 14.0, 16.0), ('climb_up', 16.0, 24.0), ('have_a_rest', 24.0, 32.0), ('climb_down', 32.0, 40.0), ('have_a_rest', 40.0, 48.0), ('climb_up', 48.0, 56.0), ('have_a_rest', 56.0, 64.0), ('climb_down', 64.0, 72.0), ('have_a_rest', 72.0, 80.0), ('climb_up', 80.0, 88.0), ('have_a_rest', 88.0, 96.0), ('climb_down', 96.0, 104.0), ('have_a_rest', 104.0, 112.0), ('climb_up', 112.0, 120.0), ('have_a_rest', 120.0, 128.0), ('climb_down', 128.0, 136.0), ('have_a_rest', 136.0, 144.0), ('climb_up', 144.0, 152.0), ('have_a_rest', 152.0, 160.0), ('climb_down', 160.0, 168.0), ('have_a_rest', 168.0, 176.0), ('climb_up', 176.0, 184.0), ('have_a_rest', 184.0, 192.0), ('climb_down', 192.0, 200.0), ('have_a_rest', 200.0, 210.050612)]}
-
-    # Read the CSV file into a DataFrame
-    #df = pd.read_csv("./pkls/0_mix1.csv")
-    df = pd.read_csv("./pkls/0_k265_device36_2.csv")
-    
-    all_data = df.values
-    headers = df.columns.tolist()
-
-    # set the start to 0
-    all_data[:, 0] = all_data[:, 0] - all_data[0][0]
-    timestamps = all_data[:, 0]
-    column_index = 5  # Default column index
+                     "K265_cutmore_padded_120":[('get_ready', 0.0, 4.0), ('moving', 4.0, 6.0), ('stop', 6.0, 8.0), ('moving', 8.0, 10.0), ('stop', 10.0, 12.0), ('moving', 12.0, 14.0), ('stop', 14.0, 16.0), ('climb_up', 16.0, 24.0), ('have_a_rest', 24.0, 32.0), ('climb_down', 32.0, 40.0), ('have_a_rest', 40.0, 48.0), ('climb_up', 48.0, 56.0), ('have_a_rest', 56.0, 64.0), ('climb_down', 64.0, 72.0), ('have_a_rest', 72.0, 80.0), ('climb_up', 80.0, 88.0), ('have_a_rest', 88.0, 96.0), ('climb_down', 96.0, 104.0), ('have_a_rest', 104.0, 112.0), ('climb_up', 112.0, 120.0), ('have_a_rest', 120.0, 128.0), ('climb_down', 128.0, 136.0), ('have_a_rest', 136.0, 144.0), ('climb_up', 144.0, 152.0), ('have_a_rest', 152.0, 160.0), ('climb_down', 160.0, 168.0), ('have_a_rest', 168.0, 176.0), ('climb_up', 176.0, 184.0), ('have_a_rest', 184.0, 192.0), ('climb_down', 192.0, 200.0), ('have_a_rest', 200.0, 210.050612)],
+                     "K265_cutmore_padded_130":[('get_ready', 0.0, 3.692304), ('moving', 3.692304, 5.538456), ('stop', 5.538456, 7.384608), ('moving', 7.384608, 9.23076), ('stop', 9.23076, 11.076912), ('moving', 11.076912, 12.923064), ('stop', 12.923064, 14.769216), ('climb_up', 14.769216, 22.153824), ('have_a_rest', 22.153824, 29.538432), ('climb_down', 29.538432, 36.92304), ('have_a_rest', 36.92304, 44.307648), ('climb_up', 44.307648, 51.692256), ('have_a_rest', 51.692256, 59.076864), ('climb_down', 59.076864, 66.461472), ('have_a_rest', 66.461472, 73.84608), ('climb_up', 73.84608, 81.230688), ('have_a_rest', 81.230688, 88.615296), ('climb_down', 88.615296, 95.999904), ('have_a_rest', 95.999904, 103.384512), ('climb_up', 103.384512, 110.76912), ('have_a_rest', 110.76912, 118.153728), ('climb_down', 118.153728, 125.538336), ('have_a_rest', 125.538336, 132.922944), ('climb_up', 132.922944, 140.307552), ('have_a_rest', 140.307552, 147.69216), ('climb_down', 147.69216, 155.07676800000002), ('have_a_rest', 155.07676800000002, 162.461376), ('climb_up', 162.461376, 169.845984), ('have_a_rest', 169.845984, 177.230592), ('climb_down', 177.230592, 184.61520000000002), ('have_a_rest', 184.61520000000002, 194.037551)]}
 
     # Initialize Tkinter frame and draggable intervals
-    app = DraggableIntervals(root, "doremi_acc_padded8", headers, all_data, column_index)
+    app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_mix1.csv")
     app.connect()
 
     root.mainloop()

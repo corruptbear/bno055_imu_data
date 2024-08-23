@@ -138,4 +138,4 @@ def load_imu_data(filename):
     #plt.show()
     
 if __name__ == "__main__":
-    load_imu_data("./pkls/0_k265_device36_2.pkl")
+    load_imu_data("./pkls/0_k265_device36_3.pkl")
