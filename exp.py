@@ -4,6 +4,7 @@ import pandas as pd
 from matplotlib.patches import Patch
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import Tk, Frame, filedialog, Radiobutton, StringVar, Button, OptionMenu
+from tkinter import Label, Entry
 import tkinter as tk
 from tkinter import messagebox
 from load_imu_data import formats
@@ -55,8 +56,8 @@ class DraggableIntervals:
         self.alignment_path = base + '_alignment.yaml'
 
         self.load_alignments()
-        print(type(self.alignments))
-        print(self.alignments)
+        print(type(self.alignment_offsets))
+        print(self.alignment_offsets)
 
         self.interval_name = interval_name
         
@@ -128,21 +129,19 @@ class DraggableIntervals:
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
 
-        offset = 0
-        if self.interval_name in self.alignments:
-            offset = self.alignments[self.interval_name]
-        self.load_color_patches(interval_name, offset = offset)
+        self.load_color_patches_offset(self.interval_name)
+
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
 
     def load_alignments(self):
         """
-        load the saved alignments for songs
+        load the saved alignments for the current file
         """
-        self.alignments = load_yaml(self.alignment_path)
+        self.alignment_offsets = load_yaml(self.alignment_path)
 
     def save_alignment(self):
         """
-        Save alignment with handling for duplicated keys
+        Save alignment with handling for duplicated keys (allowing multiple instances of the same song)
 
         Save one at a time
         """
@@ -151,7 +150,7 @@ class DraggableIntervals:
         # current position minus the original position (not necessary 0 because we remove ready patches)
         offset = float(patch['patch'].get_xy()[0][0])  - float(patch['limits'][0])
 
-        if self.interval_name in self.alignments:
+        if self.interval_name in self.alignment_offsets:
             # Ask user if they want to override or save as a new value
             result = messagebox.askquestion(
                 "Overwrite or Save As New",
@@ -161,22 +160,22 @@ class DraggableIntervals:
             )
             if result == 'yes':
                 # Overwrite existing key
-                self.alignments[self.interval_name] = offset
+                self.alignment_offsets[self.interval_name] = offset
             else:
                 # Save as a new unique key
                 new_key = self.interval_name
                 counter = 1
-                while new_key in self.alignments:
+                while new_key in self.alignment_offsets:
                     new_key = f"{self.interval_name}_{counter}"
                     counter += 1
-                self.alignments[new_key] = offset
+                self.alignment_offsets[new_key] = offset
         else:
             # Key does not exist, simply add it
-            self.alignments[self.interval_name] = offset
+            self.alignment_offsets[self.interval_name] = offset
 
-        print(self.alignments)
+        print(self.alignment_offsets)
 
-        save_yaml(self.alignments, self.alignment_path, 'w')
+        save_yaml(self.alignment_offsets, self.alignment_path, 'w')
 
     def set_font_sizes(self, dpi):
         """
@@ -195,11 +194,17 @@ class DraggableIntervals:
     def on_dropdown_change(self, *args):
         selected_interval_name = self.dropdown_var.get()
         print(f"Selected value from dropdown: {selected_interval_name}")
-        
+
+        self.load_color_patches_offset(selected_interval_name)
+
+    def load_color_patches_offset(self, interval_name):
+        """
+        load the color patches, not starting from time 0
+        """
         offset = 0
-        if selected_interval_name in self.alignments:
-            offset = self.alignments[selected_interval_name]
-        self.load_color_patches(selected_interval_name, offset = offset)
+        if interval_name in self.alignment_offsets:
+            offset = self.alignment_offsets[interval_name]
+        self.load_color_patches(interval_name, offset = offset)
 
     def load_color_patches(self, interval_name, offset = 0):
         intervals = [(x, y, z) for (x, y, z) in all_intervals[interval_name] if "ready" not in x]
