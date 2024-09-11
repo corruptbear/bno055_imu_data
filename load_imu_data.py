@@ -138,4 +138,6 @@ def load_imu_data(filename):
     #plt.show()
     
 if __name__ == "__main__":
-    load_imu_data("./pkls/0_k265_device36_3.pkl")
+    #load_imu_data("./pkls/0_k265_device36_3.pkl")
+    #load_imu_data("./pkls/0_doremi_acc_partial.pkl")
+    load_imu_data("./pkls/0_Yankee_doodle_Saloon_style_padded_100.pkl")
