@@ -117,7 +117,7 @@ class DraggableIntervals:
         self.radio_frame.pack(side='right', fill='y')
 
         self.radio_buttons = []
-        for header in headers[5:]:
+        for header in headers[1:]:
             rb = Radiobutton(self.radio_frame, text=header, variable=self.radio_var, value=header, command=self.update_plot)
             rb.pack(anchor='w')
             self.radio_buttons.append(rb)
@@ -373,7 +373,9 @@ if __name__ == "__main__":
     #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_mix1.csv")
     #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_doremi_acc_partial.csv")
     #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_yankee.csv")
-    app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv")
+    #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv")
+    app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_doremi_acc_yankee.csv") # weird quat_x???
+    #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_k265_device36.csv")
     
     
     

@@ -67,7 +67,7 @@ def data_received_callback(address, uuid, sender_characteristic, data):
         calib_accel = (reg_value >> 2) & 0x03
         calib_gyro = (reg_value >> 4) & 0x03
         calib_sys = (reg_value >> 6) & 0x03
-        #print(f"{address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
+        print(f"{address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
 
         lock = FileLock(os.path.join(pwd, "buffer.lock"), timeout=5)
         with lock:
@@ -84,7 +84,7 @@ def data_received_callback(address, uuid, sender_characteristic, data):
         #  data_file.write('{}\t{}    {}    {}\n'.format(timestamp, hex(from_eui)[2:], hex(to_eui)[2:], range_mm))
         imu_data_received_callback_count+=1
     if uuid == RANGING_DATA_UUID:
-        txt_string = f"{address} Ranges to {data[0]} devices:\n"
+        txt_string = f"{address} Ranges to {data[0]} devices:"
         for i in range(data[0]):
            txt_string += '   0x%02X: %d mm\n'%(data[(3*i)+1], struct.unpack('<H', data[(3*i)+2:(3*i)+4])[0])
         print(txt_string)
@@ -104,8 +104,8 @@ async def connect_to_device(address):
                 tottags[address]=client
                 data_characteristics[address][characteristic.uuid]=characteristic
 
-              #if characteristic.uuid == RANGING_DATA_UUID:
-              #  await client.start_notify(characteristic, functools.partial(data_received_callback,address,characteristic.uuid))
+              if characteristic.uuid == RANGING_DATA_UUID:
+                await client.start_notify(characteristic, functools.partial(data_received_callback,address,characteristic.uuid))
     except Exception as e:
         print('ERROR: Unable to connect to TotTag {}'.format(device.address))
         traceback.print_exc()

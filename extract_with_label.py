@@ -9,6 +9,10 @@ import yaml
 
 from intervals import all_intervals
 
+"""
+this script extract labeled data from paired csv and yaml files
+"""
+
 def load_yaml(filepath):
     try:
         with open(filepath,'r') as stream:
