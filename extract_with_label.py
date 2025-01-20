@@ -5,21 +5,10 @@ import pandas as pd
 # the formats is loaded, needs change for different data collected
 from load_imu_data import formats
 import os
-import yaml
 
 from intervals import all_intervals
+from utils import *
 
-"""
-this script extract labeled data from paired csv and yaml files
-"""
-
-def load_yaml(filepath):
-    try:
-        with open(filepath,'r') as stream:
-            dictionary = yaml.safe_load(stream)
-            return dictionary
-    except:
-        return dict()
 
 def extract_labeled_data(raw_csv_path):
     base, ext = os.path.splitext(raw_csv_path)
@@ -44,13 +33,9 @@ def extract_labeled_data(raw_csv_path):
     # the column for labels (add as the last column)
     # TODO: rewrite with the alignments
     for interval_name in alignment_offsets:
-        # handle repeat TODO: needs better numbering system and make it different from the bpm 
-        interval_name_splits = interval_name.split("_")
-        if interval_name_splits[-1] in ["1","2","3","4","5","6","7","8"]:
-            interval_name = "_".join(interval_name_splits[:-1])
-        # load the offset for the current interval
         offset = alignment_offsets[interval_name]
-        current_interval = [(x, y, z) for (x, y, z) in all_intervals[interval_name] if "ready" not in x]
+        # load the offset for the current interval name (base name; ignoring numbering)
+        current_interval = [(x, y, z) for (x, y, z) in all_intervals[get_base_name(interval_name)] if "ready" not in x]
         for label, start, end in current_interval:
             start_timestamp, end_timestamp = start + offset, end + offset
             selected = [data[k,:] for k in range(len(data)) if data[k][0]>=start_timestamp and  data[k][0]<=end_timestamp]
@@ -79,4 +64,4 @@ def extract_labeled_data(raw_csv_path):
 #extract_labeled_data("./pkls/0_k265_device59_3.csv")
 #extract_labeled_data("./pkls/0_yankee_device36.csv")
 #extract_labeled_data("./pkls/0_doremi_acc_yankee_device59.csv")
-#extract_labeled_data("./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv") # no quat data
+extract_labeled_data("./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv") # no quat data; modify load_imu_data
