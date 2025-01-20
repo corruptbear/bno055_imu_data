@@ -3,26 +3,14 @@ import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from tkinter import Tk, Frame, filedialog, Radiobutton, StringVar, Button, OptionMenu
+from tkinter import Tk, Frame, filedialog, Radiobutton, StringVar, Button, OptionMenu, Listbox
 from tkinter import Label, Entry
 import tkinter as tk
 from tkinter import messagebox
 from load_imu_data import formats
 import os
-import yaml
 from intervals import all_intervals
-
-def save_yaml(dictionary,filepath,write_mode):
-    with open(filepath,write_mode) as f:
-        yaml.dump(dictionary,f)
-
-def load_yaml(filepath):
-    try:
-        with open(filepath,'r') as stream:
-            dictionary = yaml.safe_load(stream)
-            return dictionary
-    except:
-        return dict()
+from utils import *
 
 
 dpi = 300
@@ -56,12 +44,6 @@ class DraggableIntervals:
         base, ext = os.path.splitext(self.csv_path)
         self.alignment_path = base + '_alignment.yaml'
         self.export_path = base + "_labeled.csv"
-
-        self.load_alignments()
-        print(type(self.alignment_offsets))
-        print(self.alignment_offsets)
-
-        self.interval_name = interval_name
 
         # Read the CSV file into a DataFrame
         #df = pd.read_csv("./pkls/0_mix1.csv")
@@ -103,10 +85,10 @@ class DraggableIntervals:
         # load file button
         self.load_button = Button(self.button_frame, text='Load File', command=self.load_file)
         self.load_button.pack(side='left', padx=5)
-        
+
         # Add Tkinter Button for saving alignment
-        self.save_alignment_button = Button(self.button_frame, text='Save Alignment', command=self.save_alignment)
-        self.save_alignment_button.pack(side='left', padx=5)
+        self.add_new_alignment_button = Button(self.button_frame, text='Add New Alignment', command=self.add_new_alignment)
+        self.add_new_alignment_button.pack(side='left', padx=5)
 
         # Add Tkinter RadioButtons
         self.radio_var = StringVar(value=self.headers[self.column_index])
@@ -126,9 +108,35 @@ class DraggableIntervals:
         self.dropdown_menu.pack(pady=10, side=tk.LEFT)
         self.dropdown_var.trace("w", self.on_dropdown_change)
 
+        # Add Tkinter Listbox below RadioButtons
+        self.alignments_listbox_frame = Frame(self.radio_frame)
+        self.alignments_listbox_frame.pack(side='top', fill='x', pady=5)
+
+        self.alignments_listbox_label = Label(self.alignments_listbox_frame, text="Select an Item:")
+        self.alignments_listbox_label.pack(anchor='w')
+
+        self.alignments_listbox = Listbox(self.alignments_listbox_frame, height=10)  # Adjust height as needed
+        self.alignments_listbox.pack(fill='x', padx=5)
+        self.alignments_listbox.bind("<<ListboxSelect>>", self.on_alignments_listbox_select)
+
+        # Add a button to delete the selected listbox item
+        self.delete_button = Button(self.alignments_listbox_frame, text="Delete Selected", command=self.delete_selected_alignments_listbox_item)
+        self.delete_button.pack(pady=5)
+
+        # Add a button to export
+        self.save_alignments_button = Button(self.alignments_listbox_frame, text="Save Alignments", command=self.save_alignments)
+        self.save_alignments_button.pack(pady=5)
+
+        self.load_alignments()
+        print(type(self.alignment_offsets))
+        print(self.alignment_offsets)
+
+        self.interval_name = interval_name
+
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
 
         # load the patch
+        # TODO: if the file is already aligned, should load the existing patch
         self.load_color_patches_offset(self.interval_name)
 
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
@@ -139,43 +147,91 @@ class DraggableIntervals:
         """
         self.alignment_offsets = load_yaml(self.alignment_path)
 
-    def save_alignment(self):
+        # Populate the alignments_listbox
+        # keep the _1, _2... endings
+        for interval_name in self.alignment_offsets:
+            self.alignments_listbox.insert(tk.END, interval_name)
+
+    def add_new_alignment(self):
+        """
+        add new alignment to the listbox
+        """
+        patch = self.interval_patches[0]
+        # current position minus the original position (not necessary 0 because we remove ready patches)
+        offset = float(patch['patch'].get_xy()[0][0])  - float(patch['limits'][0])
+
+        dropdown_interval_name = self.dropdown_var.get()
+
+        #save the new alignment name (as in the dropdown menu) to the offsets list and the listbox
+        new_key = dropdown_interval_name
+        if new_key in self.alignment_offsets:
+            counter = 1
+            while new_key in self.alignment_offsets:
+                new_key = f"{dropdown_interval_name}_{counter}"
+                counter += 1
+            self.alignment_offsets[new_key] = offset
+        else:
+            # Key does not exist, simply add it
+            self.alignment_offsets[new_key] = offset
+        self.alignments_listbox.insert(tk.END, new_key)
+
+        print(self.alignment_offsets)
+
+
+    def save_alignments(self):
         """
         Save alignment with handling for duplicated keys (allowing multiple instances of the same song)
 
         Save one at a time
         """
+        #TODO: fix it to enable re-editing offset when reloading
+        #TODO: fix it to work with the listbox
         print("Save alignments to:", self.alignment_path)
-        patch = self.interval_patches[0]
+        #patch = self.interval_patches[0]
         # current position minus the original position (not necessary 0 because we remove ready patches)
-        offset = float(patch['patch'].get_xy()[0][0])  - float(patch['limits'][0])
+        #offset = float(patch['patch'].get_xy()[0][0])  - float(patch['limits'][0])
 
-        if self.interval_name in self.alignment_offsets:
-            # Ask user if they want to override or save as a new value
-            result = messagebox.askquestion(
-                "Overwrite or Save As New",
-                f"The key '{self.interval_name}' already exists. Do you want to overwrite it or save as a new key?"
-                "\n\nChoose 'Yes' to overwrite or 'No' to save as a new key.",
-                icon='warning'
-            )
-            if result == 'yes':
-                # Overwrite existing key
-                self.alignment_offsets[self.interval_name] = offset
-            else:
-                # Save as a new unique key
-                new_key = self.interval_name
-                counter = 1
-                while new_key in self.alignment_offsets:
-                    new_key = f"{self.interval_name}_{counter}"
-                    counter += 1
-                self.alignment_offsets[new_key] = offset
-        else:
-            # Key does not exist, simply add it
-            self.alignment_offsets[self.interval_name] = offset
+        #if self.interval_name in self.alignment_offsets:
+        #    # Ask user if they want to override or save as a new value
+        #    result = messagebox.askquestion(
+        #        "Overwrite or Save As New",
+        #        f"The key '{self.interval_name}' already exists. Do you want to overwrite it or save as a new key?"
+        #        "\n\nChoose 'Yes' to overwrite or 'No' to save as a new key.",
+        #        icon='warning'
+        #    )
+        #    if result == 'yes':
+        #        # Overwrite existing key
+        #        self.alignment_offsets[self.interval_name] = offset
+        #    else:
+        #        # Save as a new unique key
+        #        new_key = self.interval_name
+        #        counter = 1
+        #        while new_key in self.alignment_offsets:
+        #            new_key = f"{self.interval_name}_{counter}"
+        #            counter += 1
+        #        self.alignment_offsets[new_key] = offset
+        #else:
+        #    # Key does not exist, simply add it
+        #    self.alignment_offsets[self.interval_name] = offset
 
-        print(self.alignment_offsets)
+        #print(self.alignment_offsets)
 
         save_yaml(self.alignment_offsets, self.alignment_path, 'w')
+
+
+    def delete_selected_alignments_listbox_item(self):
+        # Get the index of the selected item
+        selected_items = self.alignments_listbox.curselection()
+        if selected_items:
+            for index in selected_items[::-1]:  # Reverse to avoid index shifting
+                self.alignments_listbox.delete(index)
+
+    def on_alignments_listbox_select(self, event):
+        selection = event.widget.curselection()
+        if selection:
+            selected_interval_name = event.widget.get(selection[0])
+            print(f"Selected item: {selected_interval_name}")
+            self.load_color_patches_offset(selected_interval_name)
 
     def set_font_sizes(self, dpi):
         """
@@ -192,22 +248,28 @@ class DraggableIntervals:
                 ax.spines[axis].set_linewidth(plt.rcParams['axes.linewidth'])
 
     def on_dropdown_change(self, *args):
+        #TODO: change it to only load new interval
         selected_interval_name = self.dropdown_var.get()
         print(f"Selected value from dropdown: {selected_interval_name}")
 
-        self.load_color_patches_offset(selected_interval_name)
+        #self.load_color_patches_offset(selected_interval_name)
+        self.load_color_patches(selected_interval_name)
 
     def load_color_patches_offset(self, interval_name):
         """
         load the color patches, not starting from time 0
         """
+        #TODO: when there are multiple instances of the same patch in the alignments, currently only the first patch is loaded; should enable selection in such cases
         offset = 0
         if interval_name in self.alignment_offsets:
             offset = self.alignment_offsets[interval_name]
+
         self.load_color_patches(interval_name, offset = offset)
 
     def load_color_patches(self, interval_name, offset = 0):
-        intervals = [(x, y, z) for (x, y, z) in all_intervals[interval_name] if "ready" not in x]
+        base_interval_name = get_base_name(interval_name)
+        intervals = [(x, y, z) for (x, y, z) in all_intervals[base_interval_name] if "ready" not in x]
+        # the interval name could end with _1, _2...
         self.interval_name = interval_name
         # Clear the existing patches
         for p in self.interval_patches:
@@ -279,6 +341,12 @@ class DraggableIntervals:
     def on_release(self, event):
         self.press = None
         self.ax.figure.canvas.draw()
+        patch = self.interval_patches[0]
+        # current position minus the original position (not necessary 0 because we remove ready patches)
+        offset = float(patch['patch'].get_xy()[0][0])  - float(patch['limits'][0])
+        # save the current offset
+        self.alignment_offsets[self.interval_name] = offset
+        print("on realease",offset)
 
     def on_export_button_press(self):
         """
@@ -367,11 +435,11 @@ if __name__ == "__main__":
 
 
     # Initialize Tkinter frame and draggable intervals
-    #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_mix1.csv")
+    app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_mix1.csv")
     #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_doremi_acc_partial.csv")
     #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_yankee.csv")
     #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv")
-    app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_doremi_acc_yankee.csv") # weird quat_x???
+    #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_doremi_acc_yankee.csv") # weird quat_x???
     #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_k265_device36.csv")
     
     
