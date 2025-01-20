@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # saved_imu_uwb.txt : two devices in hand
-with open("saved_imu_uwb3.txt", "r") as f:
+with open("saved_imu_uwb1.txt", "r") as f:
     log_data = f.read()
     #print(log_data[:100])
 
@@ -79,10 +79,8 @@ for line in log_data_lines:
     if range_matches_1:
         ranges.append(float(range_matches_1.group(2)))
         t_ranges.append(t1_current)
-    
-    
 
-    
+
 #print(X)
 #print(ranges)
 
@@ -95,6 +93,9 @@ for line in log_data_lines:
 # Create a figure and axis
 fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(8, 8))
 
+start_time = max(min(t_XYZ1),min(t_XYZ2),min(t_ranges))
+end_time = min(max(t_XYZ1),max(t_XYZ2),max(t_ranges))
+
 # Plot X, Y, Z on the same axis
 ax1.plot(t_XYZ1, gx1, label="X", color="blue")
 ax1.plot(t_XYZ1, gy1, label="Y", color="green")
@@ -103,6 +104,7 @@ ax1.set_xlabel('Time (s)')
 ax1.set_ylabel('Gyro_raw (X,Y,Z)')
 ax1.legend(loc="upper left")
 ax1.set_title("device 1")
+ax1.set_xlim(start_time,end_time)
 
 # Plot X, Y, Z on the same axis
 ax2.plot(t_XYZ2, gx2, label="X", color="blue")
@@ -112,6 +114,7 @@ ax2.set_xlabel('Time (s)')
 ax2.set_ylabel('Gyro_raw (X,Y,Z)')
 ax2.legend(loc="upper left")
 ax2.set_title("device 2")
+ax2.set_xlim(start_time,end_time)
 
 # Plot X, Y, Z on the same axis
 ax3.plot(t_XYZ1, X1, label="X", color="blue")
@@ -121,6 +124,7 @@ ax3.set_xlabel('Time (s)')
 ax3.set_ylabel('linear_acc_raw (X,Y,Z)')
 ax3.legend(loc="upper left")
 ax3.set_title("device 1")
+ax3.set_xlim(start_time,end_time)
 
 # Plot X, Y, Z on the same axis
 ax4.plot(t_XYZ2, X2, label="X", color="blue")
@@ -130,6 +134,7 @@ ax4.set_xlabel('Time (s)')
 ax4.set_ylabel('linear_acc_raw (X,Y,Z)')
 ax4.legend(loc="upper left")
 ax4.set_title("device 2")
+ax4.set_xlim(start_time,end_time)
 
 
 ax5.plot(t_ranges, ranges, label="Range", color="purple")
@@ -137,6 +142,7 @@ ax5.set_xlabel('Time (s)')
 ax5.set_ylabel('Range (mm)')
 ax5.legend(loc="upper right")
 ax5.set_title('Range Data')
+ax5.set_xlim(start_time,end_time)
 
 
 #plt.plot(t_XYZ, X)
