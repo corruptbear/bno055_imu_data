@@ -100,11 +100,15 @@ def generate_headers_formats(data_types):
             formats+=["%.14f"]*4
     return headers,formats
 
+# specifies the types of data in the file to be loaded
 data_types = [STAT_DATA,LACC_DATA,GYRO_DATA,QUAT_DATA]
 headers,formats = generate_headers_formats(data_types)
 IMU_DATA_LEN = sum([data_type_len[x] for x in data_types])
 
 def load_imu_data(filename):
+    """
+    load data from .pkl file and save to .csv file
+    """
     #a = load_data("./0_Yankee_doodle_Saloon_style_padded_100.pkl")
     a = load_data(filename)#"./Unknown.pkl"
     all_data = []

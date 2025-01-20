@@ -62,32 +62,29 @@ class DraggableIntervals:
         print(self.alignment_offsets)
 
         self.interval_name = interval_name
-        
+
         # Read the CSV file into a DataFrame
         #df = pd.read_csv("./pkls/0_mix1.csv")
         df = pd.read_csv(csv)
-    
-        all_data = df.values
-        headers = df.columns.tolist()
 
+        all_data = df.values
         # set the start to 0
         all_data[:, 0] = all_data[:, 0] - all_data[0][0]
+        self.data = all_data
         self.timestamps = all_data[:, 0]
-        column_index = 5  # Default column index
 
         # Set font sizes and DPI
         self.set_font_sizes(dpi=300)  # Default DPI
 
-        self.headers = headers
-        self.data = all_data
-        self.column_index = column_index
+        self.headers = df.columns.tolist()
+        self.column_index = 5 # Default column index
         self.press = None
         self.offsets = []
         self.interval_patches = []
         self.label_to_color = {}
 
         # Plot initial data
-        self.full_plot, = self.ax.plot(self.data[:, 0], self.data[:, column_index], label='Time Series A')
+        self.full_plot, = self.ax.plot(self.data[:, 0], self.data[:, self.column_index], label='Time Series A')
 
         # Initialize zoom plot
         self.zoom_line, = self.zoom_ax.plot([], [], 'r-')
@@ -112,12 +109,12 @@ class DraggableIntervals:
         self.save_alignment_button.pack(side='left', padx=5)
 
         # Add Tkinter RadioButtons
-        self.radio_var = StringVar(value=headers[column_index])
+        self.radio_var = StringVar(value=self.headers[self.column_index])
         self.radio_frame = Frame(self.master)
         self.radio_frame.pack(side='right', fill='y')
 
         self.radio_buttons = []
-        for header in headers[1:]:
+        for header in self.headers[1:]:
             rb = Radiobutton(self.radio_frame, text=header, variable=self.radio_var, value=header, command=self.update_plot)
             rb.pack(anchor='w')
             self.radio_buttons.append(rb)
