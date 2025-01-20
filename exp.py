@@ -155,6 +155,7 @@ class DraggableIntervals:
     def add_new_alignment(self):
         """
         add new alignment to the listbox
+        save alignment offset associated with the new alignment
         """
         patch = self.interval_patches[0]
         # current position minus the original position (not necessary 0 because we remove ready patches)
@@ -345,7 +346,12 @@ class DraggableIntervals:
         # current position minus the original position (not necessary 0 because we remove ready patches)
         offset = float(patch['patch'].get_xy()[0][0])  - float(patch['limits'][0])
         # save the current offset
-        self.alignment_offsets[self.interval_name] = offset
+
+        # only modify alignment offsets if the listbox is selected
+        if self.alignments_listbox.curselection():
+            selected_index = selected_indices[0]
+            selected_item = self.alignments_listbox.get(selected_index)
+            self.alignment_offsets[self.selected_item] = offset
         print("on realease",offset)
 
     def on_export_button_press(self):
