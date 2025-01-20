@@ -34,39 +34,60 @@ plt.rcParams.update({
     'figure.dpi':300
 })
 
+# Create a mock event object to simulate the event handler
+class MockEvent:
+    pass
+
 class DraggableIntervals:
-    def __init__(self, master, interval_name, csv=None):
+    def __init__(self, master, csv=None):
         self.master = master
-        self.fig, (self.ax, self.zoom_ax) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 2]}, figsize=(8, 6), dpi=300)
-        plt.subplots_adjust(bottom=0.1, hspace=0.4)
-        print("figure DPI",self.fig.get_dpi())
-        self.csv_path = csv
-        base, ext = os.path.splitext(self.csv_path)
-        self.alignment_path = base + '_alignment.yaml'
-        self.export_path = base + "_labeled.csv"
 
-        # Read the CSV file into a DataFrame
-        #df = pd.read_csv("./pkls/0_mix1.csv")
-        df = pd.read_csv(csv)
-
-        all_data = df.values
-        # set the start to 0
-        all_data[:, 0] = all_data[:, 0] - all_data[0][0]
-        self.data = all_data
-        self.timestamps = all_data[:, 0]
-
-        # Set font sizes and DPI
-        self.set_font_sizes(dpi=300)  # Default DPI
-
-        self.headers = df.columns.tolist()
         self.column_index = 5 # Default column index
         self.press = None
-        self.offsets = []
+        self.radio_buttons = []
+
+        self.init_components()
+
+        self.set_new_file(csv)
+
+        # load the patch
+        # TODO: if the file is already aligned, should load the existing patch
+        #self.load_color_patches_offset(self.interval_name)
+        self.canvas.get_tk_widget().pack(fill='both', expand=True)
+
+    def set_new_file(self,csv):
         self.interval_patches = []
         self.label_to_color = {}
 
-        # Plot initial data
+        self.read_data(csv)
+
+        # initialize plot
+        self.ax.clear()
         self.full_plot, = self.ax.plot(self.data[:, 0], self.data[:, self.column_index], label='Time Series A')
+
+        self.radio_var.set(self.headers[self.column_index])
+
+        for rb in self.radio_buttons:
+            rb.destroy()
+        self.radio_buttons = []
+        for header in self.headers[1:]:
+            rb = Radiobutton(self.radio_frame, text=header, variable=self.radio_var, value=header, command=self.update_plot)
+            rb.pack(anchor='w')
+            self.radio_buttons.append(rb)
+
+        #self.dropdown_var.set(self.interval_name)  # Default value
+        self.alignments_listbox.delete(0, tk.END)
+        self.load_alignments()
+        print(self.alignment_offsets)
+
+    def init_components(self):
+        self.fig, (self.ax, self.zoom_ax) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 2]}, figsize=(8, 6), dpi=300)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
+        plt.subplots_adjust(bottom=0.1, hspace=0.4)
+
+        print("figure DPI",self.fig.get_dpi())
+        # Set font sizes and DPI
+        self.set_font_sizes(dpi=300)  # Default DPI
 
         # Initialize zoom plot
         self.zoom_line, = self.zoom_ax.plot([], [], 'r-')
@@ -91,55 +112,53 @@ class DraggableIntervals:
         self.add_new_alignment_button.pack(side='left', padx=5)
 
         # Add Tkinter RadioButtons
-        self.radio_var = StringVar(value=self.headers[self.column_index])
         self.radio_frame = Frame(self.master)
         self.radio_frame.pack(side='right', fill='y')
 
-        self.radio_buttons = []
-        for header in self.headers[1:]:
-            rb = Radiobutton(self.radio_frame, text=header, variable=self.radio_var, value=header, command=self.update_plot)
-            rb.pack(anchor='w')
-            self.radio_buttons.append(rb)
+        self.radio_var = StringVar()
 
         # Create and place the dropdown menu
         self.dropdown_var = StringVar()
-        self.dropdown_var.set(interval_name)  # Default value
+        self.dropdown_var.set(list(all_intervals.keys())[0])
         self.dropdown_menu = OptionMenu(self.button_frame, self.dropdown_var, *[key for key in all_intervals])
         self.dropdown_menu.pack(pady=10, side=tk.LEFT)
         self.dropdown_var.trace("w", self.on_dropdown_change)
 
         # Add Tkinter Listbox below RadioButtons
         self.alignments_listbox_frame = Frame(self.radio_frame)
-        self.alignments_listbox_frame.pack(side='top', fill='x', pady=5)
+        self.alignments_listbox_frame.pack(side='bottom', fill='x', pady=5)
 
         self.alignments_listbox_label = Label(self.alignments_listbox_frame, text="Select an Item:")
         self.alignments_listbox_label.pack(anchor='w')
 
-        self.alignments_listbox = Listbox(self.alignments_listbox_frame, height=10)  # Adjust height as needed
+        self.alignments_listbox = Listbox(self.alignments_listbox_frame, height=10, selectmode=tk.SINGLE)  # Adjust height as needed
         self.alignments_listbox.pack(fill='x', padx=5)
         self.alignments_listbox.bind("<<ListboxSelect>>", self.on_alignments_listbox_select)
 
         # Add a button to delete the selected listbox item
-        self.delete_button = Button(self.alignments_listbox_frame, text="Delete Selected", command=self.delete_selected_alignments_listbox_item)
+        self.delete_button = Button(self.alignments_listbox_frame, text="Delete", command=self.delete_selected_alignments_listbox_item)
         self.delete_button.pack(pady=5)
 
         # Add a button to export
-        self.save_alignments_button = Button(self.alignments_listbox_frame, text="Save Alignments", command=self.save_alignments)
+        self.save_alignments_button = Button(self.alignments_listbox_frame, text="Export", command=self.save_alignments)
         self.save_alignments_button.pack(pady=5)
 
-        self.load_alignments()
-        print(type(self.alignment_offsets))
-        print(self.alignment_offsets)
+    def read_data(self, csv):
+        self.csv_path = csv
+        base, ext = os.path.splitext(self.csv_path)
+        self.alignment_path = base + '_alignment.yaml'
+        print(f"alignment path is {self.alignment_path}")
+        self.export_path = base + "_labeled.csv"
+        # Read the CSV file into a DataFrame
+        #df = pd.read_csv("./pkls/0_mix1.csv")
+        df = pd.read_csv(self.csv_path)
 
-        self.interval_name = interval_name
-
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
-
-        # load the patch
-        # TODO: if the file is already aligned, should load the existing patch
-        self.load_color_patches_offset(self.interval_name)
-
-        self.canvas.get_tk_widget().pack(fill='both', expand=True)
+        all_data = df.values
+        # set the start to 0
+        all_data[:, 0] = all_data[:, 0] - all_data[0][0]
+        self.data = all_data
+        self.timestamps = all_data[:, 0]
+        self.headers = df.columns.tolist()
 
     def load_alignments(self):
         """
@@ -151,6 +170,14 @@ class DraggableIntervals:
         # keep the _1, _2... endings
         for interval_name in self.alignment_offsets:
             self.alignments_listbox.insert(tk.END, interval_name)
+
+        # default selection: first item
+        if len(self.alignment_offsets):
+            self.alignments_listbox.selection_set(0)
+            # simulate mouse click
+            mock_event = MockEvent()
+            mock_event.widget = self.alignments_listbox 
+            self.on_alignments_listbox_select(mock_event)
 
     def add_new_alignment(self):
         """
@@ -181,44 +208,11 @@ class DraggableIntervals:
 
     def save_alignments(self):
         """
-        Save alignment with handling for duplicated keys (allowing multiple instances of the same song)
-
-        Save one at a time
+        save alignments (as shown in the listbox)
         """
-        #TODO: fix it to enable re-editing offset when reloading
-        #TODO: fix it to work with the listbox
         print("Save alignments to:", self.alignment_path)
-        #patch = self.interval_patches[0]
-        # current position minus the original position (not necessary 0 because we remove ready patches)
-        #offset = float(patch['patch'].get_xy()[0][0])  - float(patch['limits'][0])
-
-        #if self.interval_name in self.alignment_offsets:
-        #    # Ask user if they want to override or save as a new value
-        #    result = messagebox.askquestion(
-        #        "Overwrite or Save As New",
-        #        f"The key '{self.interval_name}' already exists. Do you want to overwrite it or save as a new key?"
-        #        "\n\nChoose 'Yes' to overwrite or 'No' to save as a new key.",
-        #        icon='warning'
-        #    )
-        #    if result == 'yes':
-        #        # Overwrite existing key
-        #        self.alignment_offsets[self.interval_name] = offset
-        #    else:
-        #        # Save as a new unique key
-        #        new_key = self.interval_name
-        #        counter = 1
-        #        while new_key in self.alignment_offsets:
-        #            new_key = f"{self.interval_name}_{counter}"
-        #            counter += 1
-        #        self.alignment_offsets[new_key] = offset
-        #else:
-        #    # Key does not exist, simply add it
-        #    self.alignment_offsets[self.interval_name] = offset
-
-        #print(self.alignment_offsets)
 
         save_yaml(self.alignment_offsets, self.alignment_path, 'w')
-
 
     def delete_selected_alignments_listbox_item(self):
         # Get the index of the selected item
@@ -253,7 +247,7 @@ class DraggableIntervals:
         selected_interval_name = self.dropdown_var.get()
         print(f"Selected value from dropdown: {selected_interval_name}")
 
-        #self.load_color_patches_offset(selected_interval_name)
+        #load new masks
         self.load_color_patches(selected_interval_name)
 
     def load_color_patches_offset(self, interval_name):
@@ -271,7 +265,7 @@ class DraggableIntervals:
         base_interval_name = get_base_name(interval_name)
         intervals = [(x, y, z) for (x, y, z) in all_intervals[base_interval_name] if "ready" not in x]
         # the interval name could end with _1, _2...
-        self.interval_name = interval_name
+        #self.interval_name = interval_name
         # Clear the existing patches
         for p in self.interval_patches:
             p["patch"].remove()
@@ -310,7 +304,6 @@ class DraggableIntervals:
             contains, _ = patch['patch'].contains(event)
             if contains:
                 self.press = event.xdata
-                self.offsets = [event.xdata - p['patch'].get_xy()[0][0] for p in self.interval_patches]
                 self.background = self.ax.figure.canvas.copy_from_bbox(self.ax.bbox)
                 self.update_zoom()
                 break
@@ -384,15 +377,16 @@ class DraggableIntervals:
         """
         TODO: this is for test only; load .txt file for test
         """
-        file_path = filedialog.askopenfilename(filetypes=[('Text Files', '*.txt')])
+        file_path = filedialog.askopenfilename(filetypes=[('csv Files', '*.csv')], initialdir="./pkls")
         if file_path:
-            with open(file_path, 'r') as file:
-                content = file.read()
-                print(content)
+            #with open(file_path, 'r') as file:
+            #    content = file.read()
+            #    print(content)
+            self.set_new_file(file_path)
 
     def update_plot(self):
         """
-        Draw both plots according to current column and patches
+        Draw both the main plot and the zoom plot according to current column and patches
         """
         label = self.radio_var.get()
         self.column_index = self.headers.index(label)
@@ -404,6 +398,9 @@ class DraggableIntervals:
         self.canvas.draw()
 
     def update_zoom(self):
+        """
+        Update zoom plot, set the scope to be around the start and end of the currently applied intervals
+        """
         window_size = 100
         x0 = max(self.interval_patches[0]['patch'].get_xy()[0][0] - 10, self.timestamps[0])
         x1 = min(self.interval_patches[-1]['patch'].get_xy()[2][0] + 10, self.timestamps[-1])
@@ -438,18 +435,14 @@ if __name__ == "__main__":
     root.tk.call('tk', 'scaling', 2.0)
     print("scaled root DPI", root.winfo_fpixels('1i'))
 
-
-
     # Initialize Tkinter frame and draggable intervals
-    app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_mix1.csv")
-    #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_doremi_acc_partial.csv")
-    #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_yankee.csv")
-    #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv")
-    #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_doremi_acc_yankee.csv") # weird quat_x???
-    #app = DraggableIntervals(root, "doremi_acc_padded8", csv="./pkls/0_k265_device36.csv")
-    
-    
-    
+    app = DraggableIntervals(root, csv="./pkls/0_mix1.csv")
+    #app = DraggableIntervals(root, csv="./pkls/0_doremi_acc_partial.csv")
+    #app = DraggableIntervals(root, csv="./pkls/0_yankee.csv")
+    #app = DraggableIntervals(root, csv="./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv")
+    #app = DraggableIntervals(root, csv="./pkls/0_doremi_acc_yankee.csv") # weird quat_x???
+    #app = DraggableIntervals(root, csv="./pkls/0_k265_device36.csv")
+
     app.connect()
 
     root.mainloop()
