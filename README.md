@@ -30,11 +30,11 @@ python3.10 imu_ble.py | python3.10 2flive_plot.py
 ## processing data
 
 
-### convert .pkl to .csv uses load_imu_data.py
+1. convert .pkl to .csv using `load_imu_data.py`
 
-### annotate data using exp.py
+2. annotate data using `exp.py`
 the script loads the .csv file and set the starting timestamp to 0
 save the `_alignment.yaml`
 
-### extract labels using extract_with_label.py
+3. extract labels using `extract_with_label.py`
 given the path of the .csv file, generate labeled data using the `_alignment.yaml`

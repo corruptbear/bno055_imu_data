@@ -249,7 +249,7 @@ class DraggableIntervals:
                 self.press = event.xdata
                 self.offsets = [event.xdata - p['patch'].get_xy()[0][0] for p in self.interval_patches]
                 self.background = self.ax.figure.canvas.copy_from_bbox(self.ax.bbox)
-                self.update_zoom(event.xdata)
+                self.update_zoom()
                 break
 
     def on_motion(self, event):
@@ -274,7 +274,7 @@ class DraggableIntervals:
         for p in self.interval_patches:
             self.ax.draw_artist(p['patch'])
         self.ax.figure.canvas.blit(self.ax.bbox)
-        self.update_zoom(event.xdata)
+        self.update_zoom()
 
     def on_release(self, event):
         self.press = None
@@ -324,12 +324,12 @@ class DraggableIntervals:
         self.column_index = self.headers.index(label)
         time_series = self.data[:, self.column_index]
         self.full_plot.set_ydata(time_series)
-        self.update_zoom(self.ax.get_xlim()[0])
+        self.update_zoom()
         self.ax.relim()
         self.ax.autoscale_view()
         self.canvas.draw()
 
-    def update_zoom(self, x_center):
+    def update_zoom(self):
         window_size = 100
         x0 = max(self.interval_patches[0]['patch'].get_xy()[0][0] - 10, self.timestamps[0])
         x1 = min(self.interval_patches[-1]['patch'].get_xy()[2][0] + 10, self.timestamps[-1])
