@@ -3,10 +3,8 @@ import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from tkinter import Tk, Frame, filedialog, Radiobutton, StringVar, Button, OptionMenu, Listbox
-from tkinter import Label, Entry
+from tkinter import Tk, Frame, filedialog, Radiobutton, StringVar, Button, OptionMenu, Listbox, Label, Entry, messagebox
 import tkinter as tk
-from tkinter import messagebox
 from load_imu_data import formats
 import os
 from intervals import all_intervals
@@ -44,7 +42,6 @@ class DraggableIntervals:
 
         self.column_index = 5 # Default column index
         self.press = None
-        self.radio_buttons = []
 
         self.init_components()
 
@@ -54,31 +51,6 @@ class DraggableIntervals:
         # TODO: if the file is already aligned, should load the existing patch
         #self.load_color_patches_offset(self.interval_name)
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
-
-    def set_new_file(self,csv):
-        self.interval_patches = []
-        self.label_to_color = {}
-
-        self.read_data(csv)
-
-        # initialize plot
-        self.ax.clear()
-        self.full_plot, = self.ax.plot(self.data[:, 0], self.data[:, self.column_index], label='Time Series A')
-
-        self.radio_var.set(self.headers[self.column_index])
-
-        for rb in self.radio_buttons:
-            rb.destroy()
-        self.radio_buttons = []
-        for header in self.headers[1:]:
-            rb = Radiobutton(self.radio_frame, text=header, variable=self.radio_var, value=header, command=self.update_plot)
-            rb.pack(anchor='w')
-            self.radio_buttons.append(rb)
-
-        #self.dropdown_var.set(self.interval_name)  # Default value
-        self.alignments_listbox.delete(0, tk.END)
-        self.load_alignments()
-        print(self.alignment_offsets)
 
     def init_components(self):
         self.fig, (self.ax, self.zoom_ax) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 2]}, figsize=(8, 6), dpi=300)
@@ -116,6 +88,7 @@ class DraggableIntervals:
         self.radio_frame.pack(side='right', fill='y')
 
         self.radio_var = StringVar()
+        self.radio_buttons = []
 
         # Create and place the dropdown menu
         self.dropdown_var = StringVar()
@@ -154,11 +127,36 @@ class DraggableIntervals:
         df = pd.read_csv(self.csv_path)
 
         all_data = df.values
-        # set the start to 0
+        # set the timestamp start to 0
         all_data[:, 0] = all_data[:, 0] - all_data[0][0]
         self.data = all_data
         self.timestamps = all_data[:, 0]
         self.headers = df.columns.tolist()
+
+    def set_new_file(self,csv):
+        self.interval_patches = []
+        self.label_to_color = {}
+
+        self.read_data(csv)
+
+        # initialize plot
+        self.ax.clear()
+        self.full_plot, = self.ax.plot(self.data[:, 0], self.data[:, self.column_index], label='Time Series A')
+
+        self.radio_var.set(self.headers[self.column_index])
+
+        for rb in self.radio_buttons:
+            rb.destroy()
+        self.radio_buttons = []
+        for header in self.headers[1:]:
+            rb = Radiobutton(self.radio_frame, text=header, variable=self.radio_var, value=header, command=self.update_plot)
+            rb.pack(anchor='w')
+            self.radio_buttons.append(rb)
+
+        #self.dropdown_var.set(self.interval_name)  # Default value
+        self.alignments_listbox.delete(0, tk.END)
+        self.load_alignments()
+        print(self.alignment_offsets)
 
     def load_alignments(self):
         """

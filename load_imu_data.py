@@ -79,6 +79,7 @@ def unpack_imu_data(data, data_type_seq):
     return all_elements
 
 def generate_headers_formats(data_types):
+    # always begin with timestamp
     headers = ["timestamp"]
     formats = ['%.2f']
 

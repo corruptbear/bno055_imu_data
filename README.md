@@ -32,7 +32,7 @@ python3.10 imu_ble.py | python3.10 2flive_plot.py
 
 1. convert .pkl to .csv using `load_imu_data.py`
 
-2. annotate data using `exp.py`
+2. annotate data using `annotator.py`
 the script loads the .csv file and set the starting timestamp to 0
 save the `_alignment.yaml`
 
