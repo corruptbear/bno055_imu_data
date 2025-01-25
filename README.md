@@ -38,3 +38,14 @@ save the `_alignment.yaml`
 
 3. extract labels using `extract_with_label.py`
 given the path of the .csv file, generate labeled data using the `_alignment.yaml`
+
+## TODO
+
+investigating why the IMU timestamps repeat?
+- print out timestamp at data read interrupt time, check swo output
+- print out timestamp at write storage time, check swo output
+ultimately, in the training data, we assume 100 Hz data, timestamps are not used
+
+
+investigating why UWB data does not appear in log but available as live BLE data? there is no label "r.xx" in the pkl file we load
+- perhaps because there is no label in the test mode???
