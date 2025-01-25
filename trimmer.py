@@ -18,6 +18,7 @@ class TimeSeriesSpanManager:
         # Variables to track the selection
         self.start_select = None
         self.current_rect = None
+        self.is_selecting = False
 
         # Create a figure and axis
         self.fig, self.ax = plt.subplots()
@@ -35,24 +36,130 @@ class TimeSeriesSpanManager:
         self.span_selector = SpanSelector(self.ax, self.on_select, 'horizontal', useblit=False)
 
         # Bind mouse events for double-click functionality
+        self.fig.canvas.mpl_connect("button_press_event", self.on_press)
+        self.fig.canvas.mpl_connect("motion_notify_event", self.on_motion)
+        self.fig.canvas.mpl_connect("button_release_event", self.on_release)
         self.fig.canvas.mpl_connect("button_press_event", self.on_click)
-        #self.canvas.mpl_connect("motion_notify_event", self.on_motion)
-        #self.canvas.mpl_connect("button_press_event", self.on_press)
-        #self.canvas.mpl_connect("button_release_event", self.on_release)
 
         # Add buttons
         self.add_buttons()
         self.set_new_file(csv)
-        
+
         self.canvas_widget.pack(fill='both', expand=True)
+
+
     def on_press(self, event):
-            """
-            Event handler for mouse button press. Initializes the selection.
-            """
-            if event.inaxes != self.ax:
+        """
+        Event handler for mouse button press. Initializes the selection.
+        """
+        #if event.dblclick:
+        #    return
+        if event.inaxes != self.ax:
+            return
+        self.start_select = event.xdata  # Record the x-coordinate where selection starts
+        self.is_selecting = True  # Start selection process
+
+    def on_motion(self, event):
+        """
+        Event handler for mouse motion. Updates the rectangle during selection.
+        """
+        if event.inaxes != self.ax or not self.is_selecting:
+            return
+
+        # Remove the existing rectangle if it exists
+        if self.current_rect:
+            self.current_rect.remove()
+
+        # Draw a new rectangle from the start_select to the current x-coordinate
+        start_x = min(self.start_select, event.xdata)
+        end_x = max(self.start_select, event.xdata)
+        self.current_rect = patches.Rectangle(
+            (start_x, self.ax.get_ylim()[0]),
+            end_x - start_x,
+            self.ax.get_ylim()[1] - self.ax.get_ylim()[0],
+            linewidth=1, edgecolor="red", facecolor="red", alpha=0.5,
+        )
+        self.ax.add_patch(self.current_rect)
+        self.canvas.draw_idle()  # Redraw the canvas
+
+    def on_release(self, event):
+        """
+        Event handler for mouse button release. Finalizes the selection.
+        """
+        if event.inaxes != self.ax or not self.is_selecting:
+            return
+
+        # Finalize the selection
+        start_x = min(self.start_select, event.xdata)
+        end_x = max(self.start_select, event.xdata)
+        if abs(end_x - start_x) <=0.001:
+            return
+
+        # Add the new selection range if it doesn't overlap with existing ranges
+        for start_time, end_time in self.deleted_ranges:
+            if (start_x > start_time and start_x < end_time) or \
+               (end_x > start_time and end_x < end_time):
+                self.is_selecting = False
+                self.start_select = None
+                if self.current_rect:
+                    self.current_rect.remove()
+                    self.current_rect = None
+                self.canvas.draw_idle()
                 return
-            self.start_select = event.xdata  # Record the x-coordinate where selection starts
-    
+
+        # Add the selection to the list of deleted ranges
+        self.deleted_ranges.append((start_x, end_x))
+
+        # Reset the current rectangle
+        self.is_selecting = False
+        self.start_select = None
+        if self.current_rect:
+            self.current_rect.remove()
+            self.current_rect = None
+
+        # Update the plot with the finalized rectangles
+        self.update_rects()
+
+    def on_select(self, min_val, max_val):
+        """
+        Callback for span selection. Adds a new span if it does not overlap with existing ones.
+        """
+        return
+        new_start_time = min(min_val, max_val)
+        new_end_time = max(min_val, max_val)
+
+        # Check for overlap with existing ranges
+        for start_time, end_time in self.deleted_ranges:
+            if (new_start_time > start_time and new_start_time < end_time) or \
+               (new_end_time > start_time and new_end_time < end_time):
+                return
+
+        # Add the new range
+        self.deleted_ranges.append((new_start_time, new_end_time))
+        self.update_rects()
+
+    def update_rects(self):
+        """
+        Updates the plot by redrawing the spans.
+        """
+        # Remove existing rectangles
+        for rect in self.rects:
+            rect.remove()
+        self.rects = []
+
+        # Draw new rectangles for deleted ranges
+        for start_time, end_time in self.deleted_ranges:
+            rect = patches.Rectangle(
+                (start_time, self.ax.get_ylim()[0]),
+                end_time - start_time,
+                self.ax.get_ylim()[1] - self.ax.get_ylim()[0],
+                linewidth=1, edgecolor='red', facecolor='red', alpha=0.5
+            )
+            self.ax.add_patch(rect)
+            self.rects.append(rect)
+
+        self.canvas.draw()
+
 
     def read_data(self, csv):
         self.csv_path = csv
@@ -121,101 +228,12 @@ class TimeSeriesSpanManager:
         self.radio_var = StringVar()
         self.radio_buttons = []
 
-    def on_select(self, min_val, max_val):
-        """
-        Callback for span selection. Adds a new span if it does not overlap with existing ones.
-        """
-        new_start_time = min(min_val, max_val)
-        new_end_time = max(min_val, max_val)
-
-        # Check for overlap with existing ranges
-        for start_time, end_time in self.deleted_ranges:
-            if (new_start_time > start_time and new_start_time < end_time) or \
-               (new_end_time > start_time and new_end_time < end_time):
-                return
-
-        # Add the new range
-        self.deleted_ranges.append((new_start_time, new_end_time))
-        self.update_rects()
-    
-        
-    def on_motion(self, event):
-        """
-        Event handler for mouse motion. Updates the rectangle during selection.
-        """
-        if event.inaxes != self.ax or self.start_select is None:
-            return
-
-        # Remove the existing rectangle if it exists
-        if self.current_rect:
-            self.current_rect.remove()
-
-        # Draw a new rectangle from the start_select to the current x-coordinate
-        start_x = min(self.start_select, event.xdata)
-        end_x = max(self.start_select, event.xdata)
-        self.current_rect = matplotlib.patches.Rectangle(
-            (start_x, self.ax.get_ylim()[0]),
-            end_x - start_x,
-            self.ax.get_ylim()[1] - self.ax.get_ylim()[0],
-            linewidth=1, edgecolor="red", facecolor="red", alpha=0.5,
-        )
-        self.ax.add_patch(self.current_rect)
-        self.canvas.draw_idle()  # Redraw the canvas
-
-    def on_release(self, event):
-        """
-        Event handler for mouse button release. Finalizes the selection.
-        """
-        if event.inaxes != self.ax or self.start_select is None:
-            return
-
-        start_x = min(self.start_select, event.xdata)
-        end_x = max(self.start_select, event.xdata)
-
-        # Add the new selection range if it doesn't overlap with existing ranges
-        for start_time, end_time in self.deleted_ranges:
-            if (start_x > start_time and start_x < end_time) or \
-               (end_x > start_time and end_x < end_time):
-                self.start_select = None
-                return
-
-        # Add the selection to the list of deleted ranges
-        self.deleted_ranges.append((start_x, end_x))
-
-        # Reset the current rectangle
-        self.start_select = None
-        self.current_rect = None
-
-        # Update the plot with the finalized rectangles
-        self.update_plot()
-
-    def update_rects(self):
-        """
-        Updates the plot by redrawing the spans.
-        """
-        # Remove existing rectangles
-        for rect in self.rects:
-            rect.remove()
-        self.rects = []
-
-        # Draw new rectangles for deleted ranges
-        for start_time, end_time in self.deleted_ranges:
-            rect = patches.Rectangle(
-                (start_time, self.ax.get_ylim()[0]),
-                end_time - start_time,
-                self.ax.get_ylim()[1] - self.ax.get_ylim()[0],
-                linewidth=1, edgecolor='red', facecolor='red', alpha=0.5
-            )
-            self.ax.add_patch(rect)
-            self.rects.append(rect)
-
-        self.canvas.draw()
-
     def on_click(self, event):
         """
         Callback for mouse click. Deletes a span if double-clicked.
         """
         if event.dblclick:
+            self.is_selecting = False
             for i, (start_time, end_time) in enumerate(self.deleted_ranges):
                 if start_time <= event.xdata <= end_time:
                     self.deleted_ranges.pop(i)
@@ -359,4 +377,3 @@ if __name__ == "__main__":
 
     # Start the Tkinter main loop
     root.mainloop()
-
