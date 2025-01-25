@@ -49,3 +49,33 @@ ultimately, in the training data, we assume 100 Hz data, timestamps are not used
 
 investigating why UWB data does not appear in log but available as live BLE data? there is no label "r.xx" in the pkl file we load
 - perhaps because there is no label in the test mode???
+
+## revM-motion implementation
+
+with `_TEST_NO_EXP_DETAILS`: every device is valid
+
+
+with `_USE_DEFAULT_EXP_DETAILS`, default exp details
+at reboot, the rtc is set to the compile time
+```c
+      experiment_details_t details = {
+         .experiment_start_time = current_timestamp,
+         .experiment_end_time = current_timestamp + 604800,
+         .daily_start_time = 1,
+         .daily_end_time = 23,
+         .num_devices = 2,
+         .uids = {},
+         .uid_name_mappings = {}
+      };
+```
+
+
+offloading:
+
+
+```bash
+# in one tab:
+python3.10 segger_download.py . last_two_char_of_tottag_hex_address
+# in another tab
+python3.10 quick_download_trigger.py last_two_char_of_tottag_hex_address 1
+```
