@@ -6,6 +6,7 @@ import matplotlib.patches as patches
 from tkinter import filedialog
 import pandas as pd
 import os
+from utils import *
 
 matplotlib.use('TkAgg')
 
@@ -40,7 +41,7 @@ class TimeSeriesSpanManager:
         self.reset_button = Button(self.reset_button_ax, 'Reset')
         self.reset_button.on_clicked(self.reset)
         self.export_button = Button(self.export_button_ax, 'Export')
-        self.export_button.on_clicked(self.export)
+        self.export_button.on_clicked(self.export_trimmed)
 
         # Initialize radio buttons
         # the button labels are initialized in the set_new_file
@@ -72,6 +73,7 @@ class TimeSeriesSpanManager:
         self.original_data = all_data
         self.timestamps = all_data[:, 0]
         self.headers = df.columns.tolist()
+        self.csv_formats = infer_formats_csv(csv)
 
     def set_new_file(self,csv):
 
@@ -224,10 +226,14 @@ class TimeSeriesSpanManager:
         self.ax.autoscale_view()
         self.ax.figure.canvas.draw()
 
-    def export(self, event=None):
+    def export_trimmed(self, event=None):
+        """
+        export the trimmed file
+        """
         base, ext = os.path.splitext(self.csv_path)
         self.export_path = base + '_trimmed.csv'
-        np.savetxt(self.export_path, self.data, delimiter=',', header=','.join(self.headers), comments='')
+        np.savetxt(self.export_path, self.data, delimiter=',', header=','.join(self.headers), comments='',fmt=self.csv_formats)
+        print(f"exported to {self.export_path}")
 
 # Usage example
 if __name__ == "__main__":

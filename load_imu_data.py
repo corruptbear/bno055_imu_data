@@ -102,7 +102,8 @@ def generate_headers_formats(data_types):
     return headers,formats
 
 # specifies the types of data in the file to be loaded
-data_types = [STAT_DATA,LACC_DATA,GYRO_DATA,QUAT_DATA]
+#data_types = [STAT_DATA,LACC_DATA,GYRO_DATA,QUAT_DATA]
+data_types = [STAT_DATA,LACC_DATA,GYRO_DATA]
 headers,formats = generate_headers_formats(data_types)
 IMU_DATA_LEN = sum([data_type_len[x] for x in data_types])
 
