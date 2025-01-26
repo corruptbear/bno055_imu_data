@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import matplotlib
 from matplotlib.patches import Patch
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import Tk, Frame, filedialog, Radiobutton, StringVar, Button, OptionMenu, Listbox, Label, Entry, messagebox
@@ -10,6 +11,7 @@ import os
 from intervals import all_intervals
 from utils import *
 
+#matplotlib.use('TkAgg')
 
 dpi = 300
 base_dpi = 200
@@ -20,6 +22,7 @@ scaled_font_size = base_font_size / font_size_scale
 linewidth_scale = dpi / base_dpi
 labelpad_scale = font_size_scale
 #print(plt.rcParams.keys())
+
 plt.rcParams.update({
     'font.size': scaled_font_size,
     'axes.titlesize': scaled_font_size * 1.2,
@@ -32,6 +35,7 @@ plt.rcParams.update({
     'figure.dpi':300
 })
 
+
 # Create a mock event object to simulate the event handler
 class MockEvent:
     pass
@@ -42,6 +46,7 @@ class DraggableIntervals:
 
         self.column_index = 5 # Default column index
         self.press = None
+        self.zoom_press = None
 
         self.init_components()
 
@@ -60,12 +65,6 @@ class DraggableIntervals:
         print("figure DPI",self.fig.get_dpi())
         # Set font sizes and DPI
         self.set_font_sizes(dpi=300)  # Default DPI
-
-        # Initialize zoom plot
-        self.zoom_line, = self.zoom_ax.plot([], [], 'r-')
-        self.zoom_ax.set_title("Zoomed In View")
-        self.zoom_ax.set_xlabel("Time")
-        self.zoom_ax.set_ylabel("Value")
 
         # Create Tkinter Frame for buttons
         self.button_frame = Frame(self.master)
@@ -135,13 +134,18 @@ class DraggableIntervals:
 
     def set_new_file(self,csv):
         self.interval_patches = []
+        self.zoom_interval_spans = []
         self.label_to_color = {}
 
         self.read_data(csv)
+        self.master.title(self.csv_path)
 
         # initialize plot
         self.ax.clear()
+        self.zoom_ax.clear()
         self.full_plot, = self.ax.plot(self.data[:, 0], self.data[:, self.column_index], label='Time Series A')
+        # Initialize zoom plot
+        self.zoom_line, = self.zoom_ax.plot([], [], 'r-')
 
         self.radio_var.set(self.headers[self.column_index])
 
@@ -199,10 +203,14 @@ class DraggableIntervals:
         else:
             # Key does not exist, simply add it
             self.alignment_offsets[new_key] = offset
+        #add the new item
         self.alignments_listbox.insert(tk.END, new_key)
+        #clear existing selection and select the new item
+        self.alignments_listbox.selection_clear(0, tk.END)
+        new_index = self.alignments_listbox.get(0, tk.END).index(new_key)
+        self.alignments_listbox.select_set(new_index)
 
         print(self.alignment_offsets)
-
 
     def save_alignments(self):
         """
@@ -222,9 +230,9 @@ class DraggableIntervals:
     def on_alignments_listbox_select(self, event):
         selection = event.widget.curselection()
         if selection:
-            selected_interval_name = event.widget.get(selection[0])
-            print(f"Selected item: {selected_interval_name}")
-            self.load_color_patches_offset(selected_interval_name)
+            self.listbox_selected_interval_name = event.widget.get(selection[0])
+            print(f"Selected item: {self.listbox_selected_interval_name}")
+            self.load_color_patches_offset(self.listbox_selected_interval_name)
 
     def set_font_sizes(self, dpi):
         """
@@ -295,6 +303,12 @@ class DraggableIntervals:
         self.cidrelease = self.ax.figure.canvas.mpl_connect('button_release_event', self.on_release)
         self.cidmotion = self.ax.figure.canvas.mpl_connect('motion_notify_event', self.on_motion)
 
+        # Connect events for the zoom plot (zoom_ax). 
+        # self.ax.figure and self.zoom_ax.figure are the same
+        self.zoom_cidpress = self.zoom_ax.figure.canvas.mpl_connect('button_press_event', self.on_zoom_press)
+        self.zoom_cidrelease = self.zoom_ax.figure.canvas.mpl_connect('button_release_event', self.on_zoom_release)
+        self.zoom_cidmotion = self.zoom_ax.figure.canvas.mpl_connect('motion_notify_event', self.on_zoom_motion)
+
     def on_press(self, event):
         if event.inaxes != self.ax:
             return
@@ -303,7 +317,7 @@ class DraggableIntervals:
             if contains:
                 self.press = event.xdata
                 self.background = self.ax.figure.canvas.copy_from_bbox(self.ax.bbox)
-                self.update_zoom()
+                self.update_zoom_according_to_main()
                 break
 
     def on_motion(self, event):
@@ -328,9 +342,11 @@ class DraggableIntervals:
         for p in self.interval_patches:
             self.ax.draw_artist(p['patch'])
         self.ax.figure.canvas.blit(self.ax.bbox)
-        self.update_zoom()
+        self.update_zoom_according_to_main()
 
     def on_release(self, event):
+        if event.inaxes != self.ax:
+            return
         self.press = None
         self.ax.figure.canvas.draw()
         patch = self.interval_patches[0]
@@ -339,11 +355,80 @@ class DraggableIntervals:
         # save the current offset
 
         # only modify alignment offsets if the listbox is selected
+
+        self.alignment_offsets[self.listbox_selected_interval_name] = offset
+        print("on release",offset)
+
+    def on_zoom_press(self, event):
+        """
+        Handle mouse press in the zoom plot.
+        """
+        if event.inaxes != self.zoom_ax:
+            return
+        self.zoom_press = event.xdata  # Store the initial x position
+
+    def on_zoom_motion(self, event):
+        """
+        Handle mouse motion in the zoom plot.
+        Effect: move the span but keep the window static
+        """
+        if self.zoom_press is None:
+            return
+        if event.inaxes != self.zoom_ax:
+            return
+        xmin, xmax = self.zoom_ax.get_xlim()
+        # Calculate the drag offset
+        dx = event.xdata - self.zoom_press
+
+        # limit the move range, so that all the spans are contained in the current window
+        if (self.interval_patches[-1]['patch'].get_xy()[2][0] + dx > xmax) or (self.interval_patches[0]['patch'].get_xy()[0][0] + dx < xmin):
+            return
+
+        # Update the patches in the main plot (ax)
+        for patch in self.interval_patches:
+            new_x0 = patch['patch'].get_xy()[0][0] + dx
+            new_x1 = patch['patch'].get_xy()[2][0] + dx
+            patch['patch'].set_xy([
+                (new_x0, 0),
+                (new_x0, 1),
+                (new_x1, 1),
+                (new_x1, 0),
+                (new_x0, 0)
+            ])
+
+        # Update the zoom plot
+        self.zoom_press = event.xdata
+
+        # clear the spans in zoom_ax
+        for span in self.zoom_interval_spans:
+            span.remove()
+        self.zoom_interval_spans = []
+        # redraw the spans in zoom_ax
+        for patch in self.interval_patches:
+            label = patch['label']
+            start = patch['patch'].get_xy()[0][0]
+            end = patch['patch'].get_xy()[2][0]
+            color = self.label_to_color[label]
+            span = self.zoom_ax.axvspan(start, end, color=color, alpha=0.5, linewidth=0)
+            self.zoom_interval_spans.append(span)
+
+        self.ax.figure.canvas.draw()
+
+    def on_zoom_release(self, event):
+        """
+        Handle mouse release in the zoom plot.
+        """
+        if event.inaxes != self.zoom_ax:
+            return
+        self.zoom_press = None
+        # Save the new offset if an alignment is selected
         if self.alignments_listbox.curselection():
-            selected_index = selected_indices[0]
+            selected_index = self.alignments_listbox.curselection()[0]
             selected_item = self.alignments_listbox.get(selected_index)
-            self.alignment_offsets[self.selected_item] = offset
-        print("on realease",offset)
+            patch = self.interval_patches[0]
+            offset = float(patch['patch'].get_xy()[0][0]) - float(patch['limits'][0])
+            self.alignment_offsets[selected_item] = offset
+            print("Updated offset:", offset)
 
     def on_export_button_press(self):
         """
@@ -373,13 +458,10 @@ class DraggableIntervals:
  
     def load_file(self):
         """
-        TODO: this is for test only; load .txt file for test
+        load another file
         """
         file_path = filedialog.askopenfilename(filetypes=[('csv Files', '*.csv')], initialdir="./pkls")
         if file_path:
-            #with open(file_path, 'r') as file:
-            #    content = file.read()
-            #    print(content)
             self.set_new_file(file_path)
 
     def update_plot(self):
@@ -390,25 +472,26 @@ class DraggableIntervals:
         self.column_index = self.headers.index(label)
         time_series = self.data[:, self.column_index]
         self.full_plot.set_ydata(time_series)
-        self.update_zoom()
+        self.update_zoom_according_to_main()
         self.ax.relim()
         self.ax.autoscale_view()
         self.canvas.draw()
 
-    def update_zoom(self):
+    def update_zoom_according_to_main(self):
         """
         Update zoom plot, set the scope to be around the start and end of the currently applied intervals
         """
         window_size = 100
         x0 = max(self.interval_patches[0]['patch'].get_xy()[0][0] - 10, self.timestamps[0])
         x1 = min(self.interval_patches[-1]['patch'].get_xy()[2][0] + 10, self.timestamps[-1])
-        self.zoom_ax.set_xlim(x0, x1)
         zoom_data = self.data[(self.timestamps >= x0) & (self.timestamps <= x1)]
-        self.zoom_line.set_data(zoom_data[:, 0], zoom_data[:, self.column_index])
-        self.zoom_ax.relim()
-        self.zoom_ax.autoscale_view()
+        self.zoom_ax.set_xlim(x0, x1)
 
         self.zoom_ax.clear()  # Clear the entire axis
+
+        for span in self.zoom_interval_spans:
+            span.remove()
+        self.zoom_interval_spans = []
 
         for patch in self.interval_patches:
             label = patch['label']
@@ -416,7 +499,8 @@ class DraggableIntervals:
             end = patch['patch'].get_xy()[2][0]
             color = self.label_to_color[label]
             if start >= x0 and end <= x1:
-                patch = self.zoom_ax.axvspan(start, end, color=color, alpha=0.5, linewidth=0)
+                span = self.zoom_ax.axvspan(start, end, color=color, alpha=0.5, linewidth=0)
+                self.zoom_interval_spans.append(span)
 
         self.zoom_ax.plot(zoom_data[:, 0], zoom_data[:, self.column_index], 'r-')
         self.ax.figure.canvas.draw()

@@ -42,13 +42,21 @@ given the path of the .csv file, generate labeled data using the `_alignment.yam
 ## TODO
 
 investigating why the IMU timestamps repeat?
-- print out timestamp at data read interrupt time, check swo output
-- print out timestamp at write storage time, check swo output
+ - print out timestamp at data read interrupt time, check swo output
+ - print out timestamp at write storage time, check swo output
 ultimately, in the training data, we assume 100 Hz data, timestamps are not used
 
+when time is printed at `handle_notification`, could already see repeats;
+when time is printed at `data_ready_handler`, could already see repeats;
+         print("%d\n",app_get_experiment_time(0));
+
+investigating parsing errors
+ - length: 7
+ - the value of i decrease by 12(or multiples of 12) each time, why???? 
+ - with BLE offloading, sometimes also see the same errors
 
 investigating why UWB data does not appear in log but available as live BLE data? there is no label "r.xx" in the pkl file we load
-- perhaps because there is no label in the test mode???
+- resolved; it's issue in `process_tottag_data`, `experimental_tottag.py`. the default details do not have label mapping
 
 ## revM-motion implementation
 
@@ -72,6 +80,7 @@ at reboot, the rtc is set to the compile time
 
 offloading:
 
+you get 5MB data for 20min
 
 ```bash
 # in one tab:
