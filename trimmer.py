@@ -7,6 +7,7 @@ import pandas as pd  # Required for loading CSV files
 import matplotlib.patches as patches
 from matplotlib.widgets import SpanSelector
 import os
+from utils import *
 
 matplotlib.use('TkAgg')
 
@@ -39,7 +40,7 @@ class TimeSeriesSpanManager:
         self.fig.canvas.mpl_connect("button_press_event", self.on_press)
         self.fig.canvas.mpl_connect("motion_notify_event", self.on_motion)
         self.fig.canvas.mpl_connect("button_release_event", self.on_release)
-        self.fig.canvas.mpl_connect("button_press_event", self.on_click)
+        #self.fig.canvas.mpl_connect("button_press_event", self.on_click)
 
         # Add buttons
         self.add_buttons()
@@ -56,8 +57,16 @@ class TimeSeriesSpanManager:
         #    return
         if event.inaxes != self.ax:
             return
-        self.start_select = event.xdata  # Record the x-coordinate where selection starts
-        self.is_selecting = True  # Start selection process
+        if event.dblclick:
+            self.is_selecting = False
+            for i, (start_time, end_time) in enumerate(self.deleted_ranges):
+                if start_time <= event.xdata <= end_time:
+                    self.deleted_ranges.pop(i)
+                    self.update_rects()
+                    break
+        else:
+            self.start_select = event.xdata  # Record the x-coordinate where selection starts
+            self.is_selecting = True  # Start selection process
 
     def on_motion(self, event):
         """
@@ -86,8 +95,9 @@ class TimeSeriesSpanManager:
         """
         Event handler for mouse button release. Finalizes the selection.
         """
-        if event.inaxes != self.ax or not self.is_selecting:
-            return
+        if event.inaxes != self.ax:
+           return
+        self.is_selecting = False
 
         # Finalize the selection
         start_x = min(self.start_select, event.xdata)
@@ -99,7 +109,7 @@ class TimeSeriesSpanManager:
         for start_time, end_time in self.deleted_ranges:
             if (start_x > start_time and start_x < end_time) or \
                (end_x > start_time and end_x < end_time):
-                self.is_selecting = False
+                #self.is_selecting = False
                 self.start_select = None
                 if self.current_rect:
                     self.current_rect.remove()
@@ -177,6 +187,7 @@ class TimeSeriesSpanManager:
         self.original_data = all_data
         self.timestamps = all_data[:, 0]
         self.headers = df.columns.tolist()
+        self.csv_formats = infer_formats_csv(csv)
 
     def set_new_file(self,csv):
         self.deleted_ranges = []  # Store deleted ranges as a list of tuples (start, end)
@@ -199,6 +210,7 @@ class TimeSeriesSpanManager:
             rb = Radiobutton(self.radio_frame, text=header, variable=self.radio_var, value=header, command=self.update_plot)
             rb.pack(anchor='w')
             self.radio_buttons.append(rb)
+        self.reset(None)
 
         #self.dropdown_var.set(self.interval_name)  # Default value
         #self.alignments_listbox.delete(0, tk.END)
@@ -211,6 +223,9 @@ class TimeSeriesSpanManager:
         """
         self.button_frame = Frame(self.root)
         self.button_frame.pack(side="bottom", fill="x")
+
+        self.export_button = Button(self.button_frame, text="Export", command=self.export_trimmed)
+        self.export_button.pack(side="right", padx=5, pady=5)
 
         self.delete_button = Button(self.button_frame, text="Delete Selected Ranges", command=self.delete_selected_ranges)
         self.delete_button.pack(side="right", padx=5, pady=5)
@@ -227,18 +242,6 @@ class TimeSeriesSpanManager:
 
         self.radio_var = StringVar()
         self.radio_buttons = []
-
-    def on_click(self, event):
-        """
-        Callback for mouse click. Deletes a span if double-clicked.
-        """
-        if event.dblclick:
-            self.is_selecting = False
-            for i, (start_time, end_time) in enumerate(self.deleted_ranges):
-                if start_time <= event.xdata <= end_time:
-                    self.deleted_ranges.pop(i)
-                    self.update_rects()
-                    break
 
     def delete_selected_ranges(self):
         """
@@ -306,33 +309,8 @@ class TimeSeriesSpanManager:
         file_path = filedialog.askopenfilename(title="Select Data File", filetypes=[("CSV files", "*.csv")])
 
         if file_path:
-            try:
-                # Load data from the selected CSV file
-                data_frame = pd.read_csv(file_path)
-
-                # Assuming the CSV has columns 'time' and 'data', adjust if needed
-                if 'time' in data_frame.columns and 'data' in data_frame.columns:
-                    self.time = data_frame['time'].values
-                    self.data = data_frame['data'].values
-                else:
-                    raise ValueError("CSV file must contain 'time' and 'data' columns.")
-
-                # Clear the deleted ranges and rectangles
-                self.deleted_ranges.clear()
-                for rect in self.rects:
-                    rect.remove()
-                self.rects = []
-
-                # Redraw the plot with the new data
-                self.ax.clear()
-                self.ax.plot(self.time, self.data)
-                self.ax.set_title("Select Time Ranges to Delete")
-                self.ax.set_xlabel("Time (seconds)")
-                self.ax.set_ylabel("Value")
-                self.canvas.draw()
-
-            except Exception as e:
-                messagebox.showerror("Error", str(e))
+            print("load from:",file_path)
+            self.set_new_file(file_path)
 
     def reset(self, event=None):
         """
@@ -358,8 +336,18 @@ class TimeSeriesSpanManager:
         # Update the x-axis to match the original data
         self.ax.set_xlim(min(self.original_data[:,0]), max(self.original_data[:,0]))
 
+        self.is_selecting = False
         # Redraw the canvas
         self.fig.canvas.draw()
+
+    def export_trimmed(self, event=None):
+        """
+        export the trimmed file
+        """
+        base, ext = os.path.splitext(self.csv_path)
+        self.export_path = base + '_trimmed.csv'
+        np.savetxt(self.export_path, self.data, delimiter=',', header=','.join(self.headers), comments='',fmt=self.csv_formats)
+        print(f"exported to {self.export_path}")
 
 
 # Main application
