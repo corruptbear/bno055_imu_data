@@ -1,1 +1,0 @@
-AE62D6C7-4E48-FE5D-B0B8-7D09EDFC893F Calibration status: sys 3, gyro 3, accel 3, mag 3 Linear Accel X = -3, Y = 3, Z = 5, qw = 2513, qx = -587, qy = 539, qz = -16170, gx = -1, gy = 6, gz = 1
