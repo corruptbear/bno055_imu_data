@@ -100,18 +100,26 @@ async def connect_to_device(address):
     data_characteristics[address]=[]
     try:
         await client.connect()
+        imu_characteristic_found = False
+        ranging_characteristic_found = False
         if client.is_connected:
             for service in await client.get_services():
                 for characteristic in service.characteristics:
                     # Open a log file, register for data notifications, and add this TotTag to the list of valid devices
                     if characteristic.uuid == IMU_DATA_UUID:
+                        #print(service.uuid)
                         await client.start_notify(IMU_DATA_UUID, functools.partial(data_received_callback,address,IMU_DATA_UUID))
                         tottags[address]=client
                         data_characteristics[address].append(IMU_DATA_UUID)
+                        imu_characteristic_found = True
 
                     if characteristic.uuid == RANGING_DATA_UUID:
                         await client.start_notify(RANGING_DATA_UUID, functools.partial(data_received_callback,address,RANGING_DATA_UUID))
                         data_characteristics[address].append(RANGING_DATA_UUID)
+                        ranging_characteristic_found = True
+            print(f"imu characteristic found: {imu_characteristic_found}")
+            print(f"ranging characteristic found: {ranging_characteristic_found}")
+
 
     except Exception as e:
         print('ERROR: Unable to connect to TotTag {}'.format(client.address))
