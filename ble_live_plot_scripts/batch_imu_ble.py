@@ -35,6 +35,7 @@ def handle_interrupt(sig, frame):
 
 IMU_DATA_UUID =     'd68c3158-a23f-ee90-0c45-5231395e5d2e'
 RANGING_DATA_UUID = 'd68c3156-a23f-ee90-0c45-5231395e5d2e'
+BATCH_SIZE = 2
 
 # STATE VARIABLES -----------------------------------------------------------------------------------------------------
 
@@ -53,26 +54,44 @@ with open(os.path.join(pwd, "buffer.txt"),"w") as f:
     f.write("")
 
 # HELPER FUNCTIONS AND CALLBACKS --------------------------------------------------------------------------------------
-
-def unpack_bno055_full_imu(data):
-    gx,gy,gz = struct.unpack('<3h',data[:6])
-    qw,qx,qy,qz = struct.unpack('<4h',data[12:20])
-    laccx,laccy,laccz = struct.unpack('<3h',data[20:26])
-    reg_value = data[35]
+def unpack_bno055_burst(data):
+    """
+    the data include the 4 byte timestamp and the chunk of data starting from acc
+    """
+    timestamp = struct.unpack('<I', data[:4])[0]
+    accx,accy,accz = struct.unpack('<3h',data[4:10])
+    magx,magy,magz = struct.unpack('<3h',data[10:16])
+    gx,gy,gz = struct.unpack('<3h',data[16:22])
+    qw,qx,qy,qz = struct.unpack('<4h',data[28:36])
+    laccx,laccy,laccz = struct.unpack('<3h',data[36:42])
+    reg_value = data[49]
     calib_mag = reg_value & 0x03
     calib_accel = (reg_value >> 2) & 0x03
     calib_gyro = (reg_value >> 4) & 0x03
     calib_sys = (reg_value >> 6) & 0x03
-    return gx,gy,gz,qw,qx,qy,qz,laccx,laccy,laccz,calib_mag,calib_accel,calib_gyro,calib_sys
+    return timestamp,accx,accy,accz,gx,gy,gz,qw,qx,qy,qz,laccx,laccy,laccz,calib_mag,calib_accel,calib_gyro,calib_sys,magx,magy,magz
+
+
+def unpack_bno055_full_imu(data):
+    print(len(data))
+    unpacked = []
+    #timestamp, gx,gy,gz,qw,qx,qy,qz,laccx,laccy,laccz,calib_mag,calib_accel,calib_gyro,calib_sys = unpack_bno055_burst(data)
+    unpacked.append(unpack_bno055_burst(data))
+    unpacked.append(unpack_bno055_burst(data[52:]))
+    #timestamp2, gx2,gy2,gz2,qw2,qx2,qy2,qz2,laccx2,laccy2,laccz2,calib_mag2,calib_accel2,calib_gyro2,calib_sys2 = unpack_bno055_burst(data[52:])
+
+    #return timestamp,gx,gy,gz,qw,qx,qy,qz,laccx,laccy,laccz,calib_mag,calib_accel,calib_gyro,calib_sys
+    return unpacked
 
 def data_received_callback(address, uuid, sender_characteristic, data):
     global imu_data_received_callback_count
     #print("ble data callback",address,uuid)
     if uuid == IMU_DATA_UUID:
         #this unpacked data from burst reading
-        gx,gy,gz,qw,qx,qy,qz,laccx,laccy,laccz,calib_mag,calib_accel,calib_gyro,calib_sys = unpack_bno055_full_imu(data)
-
-        print(f"{address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
+        unpacked = unpack_bno055_full_imu(data)
+        for i in range(BATCH_SIZE):
+            timestamp,accx,accy,accz,gx,gy,gz,qw,qx,qy,qz,laccx,laccy,laccz,calib_mag,calib_accel,calib_gyro,calib_sys,magx,magy,magz = unpacked[i]
+            print(f"{timestamp} {address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Raw Accel X = {accx}, Y = {accy}, Z = {accz}, Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}, magx = {magx}, magy = {magy}, magz = {magz}\n")
 
         lock = FileLock(os.path.join(pwd, "buffer.lock"), timeout=5)
         with lock:
@@ -85,7 +104,9 @@ def data_received_callback(address, uuid, sender_characteristic, data):
             #append data to the buffer file
             with open(os.path.join(pwd, "buffer.txt"),"a") as f:
                 #f.write(f"Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag}\n")
-                f.write(f"{address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}\n")
+                for i in range(BATCH_SIZE):
+                    timestamp,accx,accy,accz,gx,gy,gz,qw,qx,qy,qz,laccx,laccy,laccz,calib_mag,calib_accel,calib_gyro,calib_sys,magx,magy,magz = unpacked[i]
+                    f.write(f"{address} Calibration status: sys {calib_sys}, gyro {calib_gyro}, accel {calib_accel}, mag {calib_mag} Raw Accel X = {accx}, Y = {accy}, Z = {accz}, Linear Accel X = {laccx}, Y = {laccy}, Z = {laccz}, qw = {qw}, qx = {qx}, qy = {qy}, qz = {qz}, gx = {gx}, gy = {gy}, gz = {gz}, magx = {magx}, magy = {magy}, magz = {magz}\n")
         #  data_file.write('{}\t{}    {}    {}\n'.format(timestamp, hex(from_eui)[2:], hex(to_eui)[2:], range_mm))
         imu_data_received_callback_count+=1
     if uuid == RANGING_DATA_UUID:

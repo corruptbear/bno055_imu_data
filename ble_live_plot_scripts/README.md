@@ -14,6 +14,11 @@ python3.10 imu_ble.py & python3.10 flive_plot.py
 python3.10 imu_ble.py | python3.10 flive_plot.py
 ```
 
+for firmware batching imu data in ble (to reduce notification frequency)
+```
+python3.10 batch_imu_ble.py & python3.10 flive_plot.py
+```
+
 or
 ```bash
 python3l10 subprocess_flive_plot.py
