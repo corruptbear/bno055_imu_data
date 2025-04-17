@@ -7,3 +7,6 @@ all_intervals = {"doremi_acc_padded8":[('get_ready', 0.0, 4.8), ('moving', 4.8, 
 # 1: transitory
 # 0: continuous
 activity_temporal_property = {"turn_back":1, "climb_up":1, "climb_down":1,  "walking_forward":0, "running_forward":0, "standing_still":0, "moving":0, "stop":0}
+
+# do not count when planning for experiments
+escape_activities_for_planning = ["get_ready","moving","stop","get_ready_to_walk_forward","get_ready_to_run_forward","get_ready_to_stand_still","have_a_rest"]
