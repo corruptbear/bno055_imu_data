@@ -49,7 +49,7 @@ def planning(target_total_duration = 20000, target_total_duration_error_margin =
 
 
     x = cp.Variable(time_matrix.shape[0], integer=True)  # servings of A, B, C
-    
+
     ##mean = cp.sum(totals) / non_zero_columns
     #objective = cp.Minimize(cp.sum_squares(totals - mean)) 
 
@@ -73,7 +73,7 @@ def planning(target_total_duration = 20000, target_total_duration_error_margin =
     #objective = cp.Minimize(cp.sum_squares(totals - mean)) 
 
     total_copies = cp.sum(x)
-    
+
     if len(init_vals)>0:
         portion_constraints = []
     else:
