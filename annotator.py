@@ -143,6 +143,7 @@ class DraggableIntervals:
         # initialize plot
         self.ax.clear()
         self.zoom_ax.clear()
+
         self.full_plot, = self.ax.plot(self.data[:, 0], self.data[:, self.column_index], label='Time Series A')
         # Initialize zoom plot
         self.zoom_line, = self.zoom_ax.plot([], [], 'r-')
@@ -159,6 +160,7 @@ class DraggableIntervals:
 
         #self.dropdown_var.set(self.interval_name)  # Default value
         self.alignments_listbox.delete(0, tk.END)
+        print(self.interval_patches)
         self.load_alignments()
         print(self.alignment_offsets)
 
@@ -180,6 +182,9 @@ class DraggableIntervals:
             mock_event = MockEvent()
             mock_event.widget = self.alignments_listbox 
             self.on_alignments_listbox_select(mock_event)
+        else:
+            #for a brand new file: just load the default patches
+            self.load_color_patches(self.dropdown_var.get())
 
     def add_new_alignment(self):
         """
@@ -268,6 +273,7 @@ class DraggableIntervals:
         self.load_color_patches(interval_name, offset = offset)
 
     def load_color_patches(self, interval_name, offset = 0):
+        print("load_color_patches called")
         base_interval_name = get_base_name(interval_name)
         intervals = [(x, y, z) for (x, y, z) in all_intervals[base_interval_name] if "ready" not in x]
         # the interval name could end with _1, _2...
