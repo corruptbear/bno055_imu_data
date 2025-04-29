@@ -100,7 +100,7 @@ class DraggableIntervals:
         self.alignments_listbox_frame = Frame(self.radio_frame)
         self.alignments_listbox_frame.pack(side='bottom', fill='x', pady=5)
 
-        self.alignments_listbox_label = Label(self.alignments_listbox_frame, text="Select an Item:")
+        self.alignments_listbox_label = Label(self.alignments_listbox_frame, text="Select a mask:")
         self.alignments_listbox_label.pack(anchor='w')
 
         self.alignments_listbox = Listbox(self.alignments_listbox_frame, height=10, selectmode=tk.SINGLE)  # Adjust height as needed
@@ -230,7 +230,10 @@ class DraggableIntervals:
         selected_items = self.alignments_listbox.curselection()
         if selected_items:
             for index in selected_items[::-1]:  # Reverse to avoid index shifting
+                list_entry_to_be_deleted = self.alignments_listbox.get(index)
                 self.alignments_listbox.delete(index)
+                # also delete the entry from the offsets table
+                del self.alignment_offsets[list_entry_to_be_deleted]
 
     def on_alignments_listbox_select(self, event):
         selection = event.widget.curselection()
@@ -273,7 +276,7 @@ class DraggableIntervals:
         self.load_color_patches(interval_name, offset = offset)
 
     def load_color_patches(self, interval_name, offset = 0):
-        print("load_color_patches called")
+        #print("load_color_patches called")
         base_interval_name = get_base_name(interval_name)
         intervals = [(x, y, z) for (x, y, z) in all_intervals[base_interval_name] if "ready" not in x]
         # the interval name could end with _1, _2...
@@ -332,6 +335,16 @@ class DraggableIntervals:
         if event.inaxes != self.ax:
             return
         dx = event.xdata - self.press
+
+        current_last_patch_end = self.interval_patches[-1]['patch'].get_xy()[2][0]
+        current_first_patch_start = self.interval_patches[0]['patch'].get_xy()[0][0]
+
+        xmin, xmax = self.ax.get_xlim()
+
+        # limit the move range, so that all the spans are contained in the current window
+        if (current_last_patch_end + dx > xmax) or (current_first_patch_start + dx < xmin):
+            return
+
         for i, p in enumerate(self.interval_patches):
             new_x0 = p['patch'].get_xy()[0][0] + dx
             new_x1 = p['patch'].get_xy()[2][0] + dx
@@ -372,6 +385,8 @@ class DraggableIntervals:
         if event.inaxes != self.zoom_ax:
             return
         self.zoom_press = event.xdata  # Store the initial x position
+        xmin, xmax = self.zoom_ax.get_xlim()
+        #print(f"on_zoom_press: xmin={xmin},xmax={xmax}")
 
     def on_zoom_motion(self, event):
         """
@@ -382,12 +397,16 @@ class DraggableIntervals:
             return
         if event.inaxes != self.zoom_ax:
             return
+
+        current_last_patch_end = self.interval_patches[-1]['patch'].get_xy()[2][0]
+        current_first_patch_start = self.interval_patches[0]['patch'].get_xy()[0][0]
+
         xmin, xmax = self.zoom_ax.get_xlim()
         # Calculate the drag offset
         dx = event.xdata - self.zoom_press
 
         # limit the move range, so that all the spans are contained in the current window
-        if (self.interval_patches[-1]['patch'].get_xy()[2][0] + dx > xmax) or (self.interval_patches[0]['patch'].get_xy()[0][0] + dx < xmin):
+        if (current_last_patch_end + dx > xmax) or (current_first_patch_start + dx < xmin):
             return
 
         # Update the patches in the main plot (ax)
@@ -452,7 +471,7 @@ class DraggableIntervals:
             selected = [self.data[k,:] for k in range(len(self.data)) if self.data[k][0]>=start_timestamp and  self.data[k][0]<=end_timestamp]
             labels = labels + [patch['label']]*len(selected)
             save = np.vstack([save, selected])
-    
+
         new_column = np.array(labels).reshape(-1,1)
 
         # Add the new column
@@ -479,36 +498,45 @@ class DraggableIntervals:
         time_series = self.data[:, self.column_index]
         self.full_plot.set_ydata(time_series)
         self.update_zoom_according_to_main()
+
+        #x0 = max(self.interval_patches[0]['patch'].get_xy()[0][0] - 10, self.timestamps[0])
+        #x1 = min(self.interval_patches[-1]['patch'].get_xy()[2][0] + 10, self.timestamps[-1])
+
         self.ax.relim()
         self.ax.autoscale_view()
+        self.ax.set_xlim(0,self.ax.get_xlim()[1])
         self.canvas.draw()
 
     def update_zoom_according_to_main(self):
         """
         Update zoom plot, set the scope to be around the start and end of the currently applied intervals
         """
+        #print("update_zoom_according_to_main")
         window_size = 100
         x0 = max(self.interval_patches[0]['patch'].get_xy()[0][0] - 10, self.timestamps[0])
         x1 = min(self.interval_patches[-1]['patch'].get_xy()[2][0] + 10, self.timestamps[-1])
         zoom_data = self.data[(self.timestamps >= x0) & (self.timestamps <= x1)]
-        self.zoom_ax.set_xlim(x0, x1)
+        zoom_y_data = zoom_data[:, self.column_index]
 
         self.zoom_ax.clear()  # Clear the entire axis
+
+        self.zoom_ax.relim()
+        self.zoom_ax.set_xlim(x0, x1)
 
         for span in self.zoom_interval_spans:
             span.remove()
         self.zoom_interval_spans = []
 
+        # draw the color patches inside the zoom window
         for patch in self.interval_patches:
             label = patch['label']
             start = patch['patch'].get_xy()[0][0]
             end = patch['patch'].get_xy()[2][0]
             color = self.label_to_color[label]
-            if start >= x0 and end <= x1:
-                span = self.zoom_ax.axvspan(start, end, color=color, alpha=0.5, linewidth=0)
-                self.zoom_interval_spans.append(span)
+            span = self.zoom_ax.axvspan(max(x0,start), min(x1,end), color=color, alpha=0.5, linewidth=0)
+            self.zoom_interval_spans.append(span)
 
-        self.zoom_ax.plot(zoom_data[:, 0], zoom_data[:, self.column_index], 'r-')
+        self.zoom_ax.plot(zoom_data[:, 0], zoom_y_data, 'r-')
         self.ax.figure.canvas.draw()
 
     def disconnect(self):
