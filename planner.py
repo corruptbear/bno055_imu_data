@@ -10,6 +10,9 @@ def planning(target_total_duration = 20000, target_total_duration_error_margin =
     target_total_duration: the planned total duration (in seconds)
     target_total_duration_error_margin: how much difference from target_total_duration is tolerated. 0.2 means 80%-120% will be accepted
     minimal_portion: the minimal portion per track in the total number of tracks
+    maximal_portion: the minimal portion per track in the total number of tracks
+    tracks: a list of names of tracks planned for the experiments. must be taken from all_intervals
+    init_vals: a dict for labels and the init time (in seconds)
     """
     # Result: a dictionary mapping each key to a dict of activity durations
     activity_totals = {}
