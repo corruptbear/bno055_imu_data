@@ -10,6 +10,7 @@ from load_imu_data import formats
 import os
 from intervals import all_intervals
 from utils import *
+from collections import defaultdict
 
 #matplotlib.use('TkAgg')
 
@@ -132,6 +133,42 @@ class DraggableIntervals:
         self.timestamps = all_data[:, 0]
         self.headers = df.columns.tolist()
 
+
+    def reset_radio_buttons(self):
+        # Destroy everything inside the radio_frame (frames, labels, buttons, etc.)
+        for widget in self.radio_frame.winfo_children():
+            if widget is not self.alignments_listbox_frame:
+                        widget.destroy()
+
+        # Also reset the list
+        self.radio_buttons = []
+        grouped = defaultdict(list)
+
+        # Group by prefix (before '_')
+        for header in self.headers[1:]:  # Skip 'timestamp'
+            if '_' in header:
+                prefix, axis = header.split('_', 1)
+                grouped[prefix].append(axis)
+
+        # Create UI
+        for prefix in grouped.keys():
+            # Outer group frame
+            group_frame = Frame(self.radio_frame)
+            group_frame.pack(anchor='w', pady=5)
+
+            # Label on top
+            Label(group_frame, text=prefix).pack()
+
+            # Row of buttons
+            row = Frame(group_frame)
+            row.pack()
+
+            for axis in sorted(grouped[prefix]):  # Ensure x, y, z order
+                full_name = f"{prefix}_{axis}"
+                rb = Radiobutton(row, text=axis, variable=self.radio_var, value=full_name, command=self.update_plot)
+                rb.pack(side='left', padx=5)
+                self.radio_buttons.append(rb)
+
     def set_new_file(self,csv):
         self.interval_patches = []
         self.zoom_interval_spans = []
@@ -150,13 +187,10 @@ class DraggableIntervals:
 
         self.radio_var.set(self.headers[self.column_index])
 
-        for rb in self.radio_buttons:
-            rb.destroy()
-        self.radio_buttons = []
-        for header in self.headers[1:]:
-            rb = Radiobutton(self.radio_frame, text=header, variable=self.radio_var, value=header, command=self.update_plot)
-            rb.pack(anchor='w')
-            self.radio_buttons.append(rb)
+        #for rb in self.radio_buttons:
+        #    rb.destroy()
+        #self.radio_buttons = []
+        self.reset_radio_buttons()
 
         #self.dropdown_var.set(self.interval_name)  # Default value
         self.alignments_listbox.delete(0, tk.END)
