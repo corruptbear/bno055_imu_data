@@ -10,6 +10,7 @@ from load_imu_data import formats
 import os
 from intervals import all_intervals
 from utils import *
+from extract_with_label import extract_labeled_data
 from collections import defaultdict
 import time
 from datetime import datetime
@@ -326,6 +327,7 @@ class DraggableIntervals:
 
         #save the new alignment name (as in the dropdown menu) to the offsets list and the listbox
         new_key = dropdown_interval_name
+        print("add new alignment:", new_key, self.alignment_offsets)
         if new_key in self.alignment_offsets:
             counter = 1
             while new_key in self.alignment_offsets:
@@ -348,8 +350,11 @@ class DraggableIntervals:
         """
         save alignments (as shown in the listbox)
         """
-        print("Save alignments to:", self.alignment_path)
+        if not self.alignment_offsets:
+            messagebox.showwarning("Warning", "No alignments to save. click ADD NEW first if you have something to save.")
+            return
 
+        print("Save alignments to:", self.alignment_path)
         save_yaml(self.alignment_offsets, self.alignment_path, 'w')
 
     def delete_selected_alignments_listbox_item(self):
@@ -360,6 +365,7 @@ class DraggableIntervals:
                 list_entry_to_be_deleted = self.alignments_listbox.get(index)
                 self.alignments_listbox.delete(index)
                 # also delete the entry from the offsets table
+                # TODO: rename the existing offsets if there are multiple instances of the same track and you are deleting one of them
                 del self.alignment_offsets[list_entry_to_be_deleted]
 
     def on_alignments_listbox_select(self, event):
@@ -384,12 +390,18 @@ class DraggableIntervals:
                 ax.spines[axis].set_linewidth(plt.rcParams['axes.linewidth'])
 
     def on_dropdown_change(self, *args):
+        """
+        IMPORTANT: merely changing the dropdown menu will not add the item to the listbox
+        """
         #TODO: change it to only load new interval
-        self.listbox_selected_interval_name = self.dropdown_var.get()
-        print(f"Selected value from dropdown: {self.listbox_selected_interval_name}")
+        #self.listbox_selected_interval_name = self.dropdown_var.get()
+        listbox_selected_interval_name = self.dropdown_var.get()
+        #print(f"Selected value from dropdown: {self.listbox_selected_interval_name}")
+        print(f"Selected value from dropdown: {listbox_selected_interval_name}")
 
         #load new masks
-        self.load_color_patches(self.listbox_selected_interval_name)
+        #self.load_color_patches(self.listbox_selected_interval_name)
+        self.load_color_patches(listbox_selected_interval_name)
 
     def load_color_patches_offset(self, interval_name):
         """
@@ -501,8 +513,8 @@ class DraggableIntervals:
         # save the current offset
 
         # only modify alignment offsets if the listbox is selected
-
-        self.alignment_offsets[self.listbox_selected_interval_name] = offset
+        if hasattr(self, 'listbox_selected_interval_name'):
+            self.alignment_offsets[self.listbox_selected_interval_name] = offset
         print("on release",offset)
 
     def on_zoom_press(self, event):
@@ -586,27 +598,7 @@ class DraggableIntervals:
         """
         export button
         """
-        # TODO: save label
-        # TODO: currently only saves the current patch
-        # create empty array of the same shape
-        save  = np.empty((0, self.data.shape[1]),dtype=object)
-        # the column for labels (add as the last column)
-        labels = []
-        for patch in self.interval_patches:
-            start_timestamp, end_timestamp = patch['patch'].get_xy()[0][0], patch['patch'].get_xy()[2][0]
-            print(patch['label'], start_timestamp, end_timestamp)
-            selected = [self.data[k,:] for k in range(len(self.data)) if self.data[k][0]>=start_timestamp and  self.data[k][0]<=end_timestamp]
-            labels = labels + [patch['label']]*len(selected)
-            save = np.vstack([save, selected])
-
-        new_column = np.array(labels).reshape(-1,1)
-
-        # Add the new column
-        save = np.hstack([save, new_column])
-        new_headers = ','.join(headers+["label"])
-        new_fmt = formats+["%s"]
-        # TODO:
-        np.savetxt(self.export_path, save, delimiter=',', header=new_headers, comments='', fmt=new_fmt)
+        extract_labeled_data(self.csv_path)
  
     def load_file(self):
         """
