@@ -1,9 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import argparse
 
 # the formats is loaded, needs change for different data collected
-from load_imu_data import formats
+#from load_imu_data import formats
 import os
 
 from intervals import all_intervals
@@ -49,19 +50,63 @@ def extract_labeled_data(raw_csv_path):
     # Add the new column
     save = np.hstack([save, new_column])
     new_headers = ','.join(headers+["label"])
-    new_fmt = formats+["%s"]
+    #print(new_headers)
+    #new_fmt = formats+["%s"]
+    new_fmt = generate_formats(headers)
+    new_fmt = new_fmt + ["%s"]
     # TODO:
     np.savetxt(export_path, save, delimiter=',', header=new_headers, comments='', fmt=new_fmt)
 
+def generate_formats(headers):
+    """
+    if data_type == GYRO_DATA:
+        headers = headers + ["gyro_x","gyro_y","gyro_z"]
+        formats+=["%.4f"]*3
+    if data_type == STAT_DATA:
+        headers = headers + ["calib_mag","calib_accel","calib_gyro","calib_sys"]
+        formats+=["%d"]*4
+    if data_type == LACC_DATA:
+        headers = headers + ["lacc_x","lacc_y","lacc_z"]
+        formats+=["%.4f"]*3
+    if data_type == ACC_DATA:
+        headers = headers + ["acc_x","acc_y","acc_z"]
+        formats+=["%.4f"]*3
+    if data_type == QUAT_DATA:
+        headers = headers + ["quat_w","quat_x","quat_y","quat_z"]
+        formats+=["%.14f"]*4
+    """
+    formats = []
+    for header in headers:
+        #print(header)
+        if header == "timestamp":
+            formats+=["%.2f"]
+        if header == "android_nano_timestamp":
+            formats+=["%.9f"]
+        if header == "temperature":
+            formats+=["%d"]
+        if header in ["calib_mag","calib_accel","calib_gyro","calib_sys"]:
+            formats+=["%d"]
+        if header in ["acc_x","acc_y","acc_z","lacc_x","lacc_y","lacc_z","gyro_x","gyro_y","gyro_z","mag_x","mag_y","mag_z","gravity_x","gravity_y","gravity_z"]:
+            formats+=["%.4f"]
+        if header in ["quat_w","quat_x","quat_y","quat_z"]:
+            formats+=["%.14f"]
+    return formats
 
-#extract_labeled_data("./pkls/0_mix1.csv")
-#extract_labeled_data("./pkls/0_doremi_acc_partial.csv")
-#extract_labeled_data("./pkls/0_k265_device36.csv")
-#extract_labeled_data("./pkls/0_k265_device36_2.csv")
-#extract_labeled_data("./pkls/0_k265_device36_3.csv")
-#extract_labeled_data("./pkls/0_k265_device59.csv")
-#extract_labeled_data("./pkls/0_k265_device59_2.csv")
-#extract_labeled_data("./pkls/0_k265_device59_3.csv")
-#extract_labeled_data("./pkls/0_yankee_device36.csv")
-#extract_labeled_data("./pkls/0_doremi_acc_yankee_device59.csv")
-extract_labeled_data("./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv") # no quat data; modify load_imu_data
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Extract labeled data from IMU CSV using alignments.")
+    parser.add_argument("csv_path", help="Path to the input CSV file")
+    args = parser.parse_args()
+    extract_labeled_data(args.csv_path)
+    #extract_labeled_data("./pkls/0_mix1.csv")
+    #extract_labeled_data("./pkls/0_doremi_acc_partial.csv")
+    #extract_labeled_data("./pkls/0_k265_device36.csv")
+    #extract_labeled_data("./pkls/0_k265_device36_2.csv")
+    #extract_labeled_data("./pkls/0_k265_device36_3.csv")
+    #extract_labeled_data("./pkls/0_k265_device59.csv")
+    #extract_labeled_data("./pkls/0_k265_device59_2.csv")
+    #extract_labeled_data("./pkls/0_k265_device59_3.csv")
+    #extract_labeled_data("./pkls/0_yankee_device36.csv")
+    #extract_labeled_data("./pkls/0_doremi_acc_yankee_device59.csv")
+    #extract_labeled_data("./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv") # no quat data; modify load_imu_data
+    #extract_labeled_data("/Users/lws/Downloads/exp_data/trial_data/doremi_padded_simple_130_audio_imu_logs_250429_200423/ble_imu_data_250429_200238_unit_converted.csv")
+

@@ -171,4 +171,5 @@ if __name__ == "__main__":
     #load_imu_data("./pkls/0_k265_device36_3.pkl")
     #load_imu_data("./pkls/0_doremi_acc_partial.pkl")
     #load_tag_imu_data_from_pkl("./pkls/0_Yankee_doodle_Saloon_style_padded_100.pkl")
-    load_tag_imu_data_from_csv("ble_imu_data_250426_234448.csv")
+    #load_tag_imu_data_from_csv("ble_imu_data_250426_234448.csv")
+    load_tag_imu_data_from_csv("./example_data/doremi_padded_simple_130_ble_imu_data_250429_200238.csv")
