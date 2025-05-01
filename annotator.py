@@ -11,6 +11,37 @@ import os
 from intervals import all_intervals
 from utils import *
 from collections import defaultdict
+import time
+from datetime import datetime
+
+
+class WrappedLabel(tk.Frame):
+    def __init__(self, master, text="", width=200, height=30, bg='white', fg='black', relief='flat', borderwidth=1, command=None, **kwargs):
+        super().__init__(master, height=height, **kwargs)
+
+        self.command = command  # click callback
+        self.canvas = tk.Canvas(self, height=height, width=width, bg=bg, highlightthickness=0, bd=0)
+        self.canvas.pack(side='left', fill='both', expand=True)
+
+        self.label = tk.Label(self.canvas, text=text, anchor='w', bg=bg, fg=fg, relief=relief, borderwidth=borderwidth, padx=5)
+        self.label_id = self.canvas.create_window((0, 0), window=self.label, anchor='nw')
+
+        self.label.bind("<Button-1>", self._on_click)
+
+        # Optional horizontal scrollbar
+        self.scroll_x = tk.Scrollbar(self, orient='horizontal', command=self.canvas.xview)
+        self.scroll_x.pack(side='bottom', fill='x')
+        self.canvas.configure(xscrollcommand=self.scroll_x.set)
+
+        self.label.bind("<Configure>", self._resize)
+        self.canvas.bind("<Configure>", self._resize)
+
+    def _resize(self, event=None):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_click(self, event):
+        if self.command:
+            self.command()
 
 #matplotlib.use('TkAgg')
 
@@ -44,6 +75,7 @@ class MockEvent:
 class DraggableIntervals:
     def __init__(self, master, csv=None):
         self.master = master
+        self.master.bind_all("<ButtonRelease>", self.on_any_click)
 
         self.column_index = 5 # Default column index
         self.press = None
@@ -72,16 +104,12 @@ class DraggableIntervals:
         self.button_frame.pack(side='bottom', fill='x')
 
         # export button
-        self.export_button = Button(self.button_frame, text='Print A', command=self.on_export_button_press)
+        self.export_button = Button(self.button_frame, text='Export Labeled Data', command=self.on_export_button_press)
         self.export_button.pack(side='left', padx=5)
 
         # load file button
         self.load_button = Button(self.button_frame, text='Load File', command=self.load_file)
         self.load_button.pack(side='left', padx=5)
-
-        # Add Tkinter Button for saving alignment
-        self.add_new_alignment_button = Button(self.button_frame, text='Add New Alignment', command=self.add_new_alignment)
-        self.add_new_alignment_button.pack(side='left', padx=5)
 
         # Add Tkinter RadioButtons
         self.radio_frame = Frame(self.master)
@@ -90,19 +118,25 @@ class DraggableIntervals:
         self.radio_var = StringVar()
         self.radio_buttons = []
 
-        # Create and place the dropdown menu
-        self.dropdown_var = StringVar()
-        self.dropdown_var.set(list(all_intervals.keys())[0])
-        self.dropdown_menu = OptionMenu(self.button_frame, self.dropdown_var, *[key for key in all_intervals])
-        self.dropdown_menu.pack(pady=10, side=tk.LEFT)
-        self.dropdown_var.trace("w", self.on_dropdown_change)
-
         # Add Tkinter Listbox below RadioButtons
         self.alignments_listbox_frame = Frame(self.radio_frame)
         self.alignments_listbox_frame.pack(side='bottom', fill='x', pady=5)
 
+        # Create and place the dropdown menu
+        self.dropdown_var = StringVar()
+        self.dropdown_var.set(list(all_intervals.keys())[0])
+        self.dropdown_menu = OptionMenu(self.alignments_listbox_frame, self.dropdown_var, *[key for key in all_intervals])
+        self.dropdown_menu.pack(pady=5, fill='x')  # also on top
+
+        # Add Tkinter Button for saving alignment
+        self.add_new_alignment_button = Button(self.alignments_listbox_frame, text='Add New', command=self.add_new_alignment)
+        self.add_new_alignment_button.pack(padx=5, fill='y')  # on top
+
+        self.dropdown_var.trace("w", self.on_dropdown_change)
+
         self.alignments_listbox_label = Label(self.alignments_listbox_frame, text="Select a mask:")
         self.alignments_listbox_label.pack(anchor='w')
+ 
 
         self.alignments_listbox = Listbox(self.alignments_listbox_frame, height=10, selectmode=tk.SINGLE)  # Adjust height as needed
         self.alignments_listbox.pack(fill='x', padx=5)
@@ -111,15 +145,66 @@ class DraggableIntervals:
         # Add a button to delete the selected listbox item
         self.delete_button = Button(self.alignments_listbox_frame, text="Delete", command=self.delete_selected_alignments_listbox_item)
         self.delete_button.pack(pady=5)
+ 
+        """
+        # Instead of Listbox, use this container
+        self.alignments_list_frame = Frame(self.alignments_listbox_frame)
+        self.alignments_list_frame.pack(fill='both', expand=True)
+        self.selected_alignment_index = None
+
+        # Store the current list of alignments
+        self.alignment_items = ["a","b","c"]  # or load from file
+        self.render_alignment_items()
+        """
 
         # Add a button to export
-        self.save_alignments_button = Button(self.alignments_listbox_frame, text="Export", command=self.save_alignments)
+        self.save_alignments_button = Button(self.alignments_listbox_frame, text="Save", command=self.save_alignments)
         self.save_alignments_button.pack(pady=5)
+
+    def render_alignment_items(self):
+        # Clear previous widgets
+        for widget in self.alignments_list_frame.winfo_children():
+            widget.destroy()
+
+        for idx, item in enumerate(self.alignment_items):
+            item_frame = Frame(self.alignments_list_frame)
+            item_frame.pack(fill='x', padx=5, pady=2)
+
+            # Define background color for selected
+            bg = '#cce5ff' if idx == self.selected_alignment_index else 'white'
+
+            label = Label(item_frame, text=item, anchor='w', bg=bg, relief='sunken' if idx == self.selected_alignment_index else 'flat')
+            label.pack(side='left', fill='x', expand=True)
+
+            # Bind click to select
+            label.bind("<Button-1>", lambda e, i=idx: self.on_alignment_label_click(i))
+
+            delete_btn = Button(
+                item_frame, text='X', fg='red',
+                command=lambda i=idx: self.delete_alignment_item(i),
+                bd=0, padx=4, pady=0
+            )
+            delete_btn.pack(side='right')
+    def on_alignment_label_click(self, index):
+        self.selected_alignment_index = index
+        self.render_alignment_items()
+    def delete_alignment_item(self, index):
+        del self.alignment_items[index]
+        self.render_alignment_items()
+
+
+    def on_any_click(self, event):
+        if isinstance(event.widget, tk.Button):
+            timestamp = time.time()  # Unix timestamp (float)
+            print(f"Clicked: {event.widget['text']} at {timestamp:.3f}")  # milliseconds precision
+            self.annotation_button_click_log[timestamp] = f"{event.widget['text']}"
+            save_yaml(self.annotation_button_click_log, self.annotation_button_click_log_path, "w")
 
     def read_data(self, csv):
         self.csv_path = csv
         base, ext = os.path.splitext(self.csv_path)
         self.alignment_path = base + '_alignment.yaml'
+        self.annotation_button_click_log_path = base + '_annotation_button_click_log_' + datetime.now().strftime("%y%m%d_%H%M%S") + '.yaml'
         print(f"alignment path is {self.alignment_path}")
         self.export_path = base + "_labeled.csv"
         # Read the CSV file into a DataFrame
@@ -197,6 +282,7 @@ class DraggableIntervals:
         print(self.interval_patches)
         self.load_alignments()
         print(self.alignment_offsets)
+        self.annotation_button_click_log = dict()
 
     def load_alignments(self):
         """
@@ -519,7 +605,7 @@ class DraggableIntervals:
         """
         load another file
         """
-        file_path = filedialog.askopenfilename(filetypes=[('csv Files', '*.csv')], initialdir="./pkls")
+        file_path = filedialog.askopenfilename(filetypes=[('csv Files', '*.csv')], initialdir="./example_data")
         if file_path:
             self.set_new_file(file_path)
 
