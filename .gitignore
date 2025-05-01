@@ -2,3 +2,4 @@ training/
 **/__pycache__/
 *.pyc
 **/buffer.txt
+example_data/*.yaml

@@ -77,7 +77,6 @@ class DraggableIntervals:
         self.master = master
         self.master.bind_all("<ButtonRelease>", self.on_any_click)
 
-        self.column_index = 5 # Default column index
         self.press = None
         self.zoom_press = None
 
@@ -217,6 +216,14 @@ class DraggableIntervals:
         self.data = all_data
         self.timestamps = all_data[:, 0]
         self.headers = df.columns.tolist()
+        if "gyro_x" in df.columns:
+            self.column_index = df.columns.get_loc("gyro_x")
+        elif "lacc_x" in df.columns:
+            self.column_index = df.columns.get_loc("lacc_x")
+        elif "quat_x" in df.columns:
+            self.column_index = df.columns.get_loc("quat_x")
+        else:
+            self.column_index = 5
 
 
     def reset_radio_buttons(self):
@@ -378,11 +385,11 @@ class DraggableIntervals:
 
     def on_dropdown_change(self, *args):
         #TODO: change it to only load new interval
-        selected_interval_name = self.dropdown_var.get()
-        print(f"Selected value from dropdown: {selected_interval_name}")
+        self.listbox_selected_interval_name = self.dropdown_var.get()
+        print(f"Selected value from dropdown: {self.listbox_selected_interval_name}")
 
         #load new masks
-        self.load_color_patches(selected_interval_name)
+        self.load_color_patches(self.listbox_selected_interval_name)
 
     def load_color_patches_offset(self, interval_name):
         """
@@ -672,7 +679,7 @@ if __name__ == "__main__":
     print("scaled root DPI", root.winfo_fpixels('1i'))
 
     # Initialize Tkinter frame and draggable intervals
-    app = DraggableIntervals(root, csv="./pkls/0_mix1.csv")
+    app = DraggableIntervals(root, csv="./example_data/doremi_padded_simple_130_ble_imu_data_250429_200238_unit_converted.csv")
     #app = DraggableIntervals(root, csv="./pkls/0_doremi_acc_partial.csv")
     #app = DraggableIntervals(root, csv="./pkls/0_yankee.csv")
     #app = DraggableIntervals(root, csv="./pkls/0_Yankee_doodle_Saloon_style_padded_100.csv")
