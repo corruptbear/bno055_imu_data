@@ -1,3 +1,37 @@
+## processing data collected from phone
+
+### extract labeled data with the button press log approach
+
+for example, you have a file called `button_imu_logs_250507_230833.zip`
+
+run:
+```python
+import extract_labeled_data_from_button_interface from extract_with_label
+extract_labeled_data_from_button_interface("button_imu_logs_250507_230833.zip")
+```
+the zip file will be unzipped;   
+`ble_imu_data_250507_230637_unit_converted.csv` and `ble_imu_data_250507_230637_unit_converted_button_labeled.csv` (unit converted data with labels from button data) will be created in the folder
+`button_imu_logs_250507_230833`
+
+### extract labeled data with video ground truth
+
+#### case 1: video + button press log + imu data
+
+- step 1: annotate the video
+- step 2: run the annotator `python3 annotation.py`; load the raw imu data (now the annotator will convert unit automatically if not converted yet), and use the `for_marking_the_start` mask to create a special alignment file
+- step 3: 
+   ```python
+   import extract_labeled_data_from_video from extract_with_label
+   extract_labeled_data_from_video(sensor_data_path="./ble_imu_data_250429_200238_unit_converted.csv", annotation_path="./20250430_030238000_iOS.aucvl")
+   ```
+   the labeled data will be saved to `ble_imu_data_250429_200238_unit_converted_video_labeled.csv`
+
+### case 2: video + audio masks + imu data
+
+- step 1: annotate the video
+- step 2: run the annotator `python3 annotation.py`, load the raw imu data, and use the corresponding masks to create the alignment file
+- step 3: same as with case 1
+
 
 ## processing data
 
