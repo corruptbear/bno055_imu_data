@@ -1,6 +1,8 @@
 import re
 import yaml
 import csv
+import os
+import zipfile
 
 def get_base_name(name):
     # Use a regex to remove the numeric suffix preceded by an underscore
@@ -17,6 +19,16 @@ def load_yaml(filepath):
             return dictionary
     except:
         return dict()
+
+def unzip_to_dir(dir_path):
+    # Create target directory by stripping the .zip extension
+    extract_dir = dir_path[:-4]  # Remove ".zip"
+    os.makedirs(extract_dir, exist_ok=True)
+
+    with zipfile.ZipFile(dir_path, 'r') as zip_ref:
+        zip_ref.extractall(extract_dir)
+    print(f"Extracted zip to: {extract_dir}")
+    return extract_dir
 
 def infer_formats(line):
     """

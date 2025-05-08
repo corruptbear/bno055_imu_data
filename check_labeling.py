@@ -11,18 +11,27 @@ def update_plot(col):
     plt.draw()
 
 # Load CSVs
-csv_path_labeled = "ble_imu_data_250429_200238_unit_converted_video_labeled.csv"
-csv_path_unlabeled = "ble_imu_data_250429_200238_unit_converted.csv"
+csv_path_labeled = "./button_imu_logs_250507_230833/ble_imu_data_250507_230637_unit_converted_button_labeled.csv"
+csv_path_unlabeled = "./button_imu_logs_250507_230833/ble_imu_data_250507_230637_unit_converted.csv"
 
 df = pd.read_csv(csv_path_labeled)
 df_unlabeled = pd.read_csv(csv_path_unlabeled)
 
-df_unlabeled.iloc[:, 0] -= df_unlabeled.iloc[0, 0]
-timestamps_unlabeled = df_unlabeled.iloc[:, 0].values
+if "button" not in csv_path_labeled:
+    df_unlabeled.iloc[:, 0] -= df_unlabeled.iloc[0, 0]
+    timestamps_unlabeled = df_unlabeled.iloc[:, 0].values
+    timestamps = df.iloc[:, 0].values
+else:
+    df_unlabeled.iloc[:, 1] -= df_unlabeled.iloc[0, 1]
+    timestamps_unlabeled = df_unlabeled.iloc[:, 1].values
+    timestamps = df.iloc[:, 1].values
+
+
+
 headers = df_unlabeled.columns.tolist()
 
 # Label intervals
-timestamps = df.iloc[:, 0].values
+
 labels = df.iloc[:, -1]
 intervals = []
 start_time = timestamps[0]
@@ -33,6 +42,8 @@ for i in range(1, len(labels)):
         start_time = timestamps[i]
         current_label = labels[i]
 intervals.append((current_label, start_time, timestamps[-1]))
+
+print(intervals)
 
 # Colormap for labels
 col = "acc_x"

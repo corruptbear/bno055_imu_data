@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import argparse
 import json
+import glob
 
 # the formats is loaded, needs change for different data collected
 #from load_imu_data import formats
@@ -10,6 +11,7 @@ import os
 
 from intervals import all_intervals
 from utils import *
+from load_imu_data import load_tag_imu_data_from_csv
 
 
 def extract_labeled_data(raw_csv_path):
@@ -81,6 +83,20 @@ def convert_video_annotation(annotation_file_path):
     segments.append((events[-1]['label'], events[-1]['time'], events[-1]['time']+0.1))
     return segments
 
+def convert_button_annotation(log_file_path):
+    df = pd.read_csv(log_file_path)
+    labels = df['label'].values
+    timestamps = df['timestamp'].values
+
+    segments = []
+    for i in range(len(df) - 1):
+        start = timestamps[i]
+        end = timestamps[i + 1]
+        label = labels[i]
+        segments.append((label, start, end))
+    segments.append((labels[-1], timestamps[-1], None))
+    return segments
+
 
 def extract_labeled_data_from_video(sensor_data_path=None, annotation_path=None, sync_value=None):
     #sync_value???
@@ -139,6 +155,85 @@ def extract_labeled_data_from_video(sensor_data_path=None, annotation_path=None,
     np.savetxt(export_path, save, delimiter=',', header=new_headers, comments='', fmt=new_fmt)
 
 
+def extract_labeled_data_from_button_interface(dir_path = None):
+    """
+    dir_path: the path of the folder containing both the app button press log and the imu data; can be just a .zip file and it will unzip automatically
+    """
+    if dir_path.endswith('.zip'):
+        dir_path = unzip_to_dir(dir_path)
+
+    # Search for files
+    button_log_files = glob.glob(os.path.join(dir_path, "button_press_log*.csv"))
+    imu_data_files = glob.glob(os.path.join(dir_path, "ble_imu_data*.csv"))
+    # prevent errors on repeated run
+    imu_data_files = [f for f in imu_data_files if "unit_converted" not in f]
+
+    button_log_file = button_log_files[0] if button_log_files else None
+    imu_data_file = imu_data_files[0] if imu_data_files else None
+
+    print("Button log file:", button_log_file)
+
+    # convert the unit here
+    load_tag_imu_data_from_csv(imu_data_file)
+    name, ext = os.path.splitext(imu_data_file)
+    imu_data_file = f"{name}_unit_converted{ext}"
+
+
+    print("IMU data file:", imu_data_file)
+
+    button_annotation = convert_button_annotation(button_log_file)
+    #print(button_annotation)
+
+
+    base, ext = os.path.splitext(imu_data_file)
+    export_path = base + "_button_labeled.csv"
+
+    #video annotation ts + sync_value     is the ts on imu timeline
+    #video_annotation_in_imu_timeline = [(label,start_ts+sync_value,end_ts+sync_value) for (label, start_ts, end_ts) in video_annotation]
+
+    # read the data
+    df = pd.read_csv(imu_data_file)
+    data = df.values
+    headers = df.columns.tolist()
+
+
+    # create data to be saved
+    save  = np.empty((0, data.shape[1]),dtype=object)
+    labels = []
+
+
+    # load the offset for the current interval name (base name; ignoring numbering)
+    current_interval = [(x, y, z) for (x, y, z) in button_annotation if "ready" not in x]
+    for label, start, end in current_interval:
+        if end is not None:
+            start_timestamp, end_timestamp = start/1e9, end/1e9
+        else:
+            #1e10 is just a large value
+            start_timestamp, end_timestamp = start/1e9, 1e10
+        #print(start_timestamp, end_timestamp)
+        selected = [data[k,:] for k in range(len(data)) if data[k][1]>=start_timestamp and  data[k][1]<=end_timestamp]
+        labels = labels + [label]*len(selected)
+        # only concatenate when the selected is not []; otherwise dimension will not match
+        if len(selected)>0:
+            save = np.vstack([save, selected])
+
+    new_column = np.array(labels).reshape(-1,1)
+
+    # Add the new column
+    save = np.hstack([save, new_column])
+    # set the start of timestamps to 0
+    save[:, 1] = save[:, 1] - data[0][1]
+    save[:, 0] = save[:, 0] - data[0][0]
+
+    new_headers = ','.join(headers+["label"])
+    #print(new_headers)
+    #new_fmt = formats+["%s"]
+    new_fmt = generate_formats(headers)
+    new_fmt = new_fmt + ["%s"]
+
+    np.savetxt(export_path, save, delimiter=',', header=new_headers, comments='', fmt=new_fmt)
+
+
 def generate_formats(headers):
     formats = []
     for header in headers:
@@ -166,7 +261,8 @@ if __name__ == "__main__":
     """
 
     # example
-    extract_labeled_data_from_video(sensor_data_path="ble_imu_data_250429_200238_unit_converted.csv", annotation_path="20250430_030238000_iOS.aucvl")
+    #extract_labeled_data_from_video(sensor_data_path="./ble_imu_data_250429_200238_unit_converted.csv", annotation_path="./20250430_030238000_iOS.aucvl")
+    extract_labeled_data_from_button_interface("./button_imu_logs_250507_230833.zip")
 
     #extract_labeled_data("./pkls/0_mix1.csv")
     #extract_labeled_data("./pkls/0_doremi_acc_partial.csv")
