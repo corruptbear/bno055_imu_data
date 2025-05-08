@@ -606,7 +606,15 @@ class DraggableIntervals:
         """
         file_path = filedialog.askopenfilename(filetypes=[('csv Files', '*.csv')], initialdir="./example_data")
         if file_path:
-            self.set_new_file(file_path)
+            if file_path.endswith("_unit_converted.csv"):
+                self.set_new_file(file_path)
+            else:
+                # convert the file first
+                from load_imu_data import load_tag_imu_data_from_csv
+                load_tag_imu_data_from_csv(file_path)
+                name, ext = os.path.splitext(file_path)
+                converted_path = f"{name}_unit_converted{ext}"
+                self.set_new_file(converted_path )
 
     def update_plot(self):
         """
