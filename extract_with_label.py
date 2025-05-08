@@ -92,7 +92,11 @@ def extract_labeled_data_from_video(sensor_data_path=None, annotation_path=None,
     video_annotation = convert_video_annotation(annotation_path)
 
     if sync_value is None:
-        ts_first_event_imu = load_yaml(alignment_path)["for_marking_the_start"]
+        alignment = load_yaml(alignment_path)
+        if "for_marking_the_start" in alignment:
+            ts_first_event_imu = alignment["for_marking_the_start"]
+        else:
+            ts_first_event_imu = min(list(alignment.values()))
         ts_first_event_video = video_annotation[0][1]
         sync_value = ts_first_event_imu - ts_first_event_video
 
@@ -160,8 +164,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     extract_labeled_data(args.csv_path)
     """
-    #print(convert_video_annotation("20250430_030238000_iOS.aucvl"))
-    #extract_labeled_data_from_video(sensor_data_path=None, annotation_path=None, sync_value=None)
+
+    # example
     extract_labeled_data_from_video(sensor_data_path="ble_imu_data_250429_200238_unit_converted.csv", annotation_path="20250430_030238000_iOS.aucvl")
 
     #extract_labeled_data("./pkls/0_mix1.csv")
