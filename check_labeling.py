@@ -17,15 +17,10 @@ csv_path_unlabeled = "./button_imu_logs_250507_230833/ble_imu_data_250507_230637
 df = pd.read_csv(csv_path_labeled)
 df_unlabeled = pd.read_csv(csv_path_unlabeled)
 
-if "button" not in csv_path_labeled:
-    df_unlabeled.iloc[:, 0] -= df_unlabeled.iloc[0, 0]
-    timestamps_unlabeled = df_unlabeled.iloc[:, 0].values
-    timestamps = df.iloc[:, 0].values
-else:
-    df_unlabeled.iloc[:, 1] -= df_unlabeled.iloc[0, 1]
-    timestamps_unlabeled = df_unlabeled.iloc[:, 1].values
-    timestamps = df.iloc[:, 1].values
 
+df_unlabeled.iloc[:, 0] -= df_unlabeled.iloc[0, 0]
+timestamps_unlabeled = df_unlabeled.iloc[:, 0].values
+timestamps = df.iloc[:, 0].values
 
 
 headers = df_unlabeled.columns.tolist()
