@@ -143,9 +143,32 @@ def extract_labeled_data_from_video(sensor_data_path=None, annotation_path=None,
     #video_annotation_in_imu_timeline = [(label,start_ts+sync_value,end_ts+sync_value) for (label, start_ts, end_ts) in video_annotation]
 
     # read the data
-    df = pd.read_csv(sensor_data_path)
+    # Step 1: Read raw data using csv.reader
+    with open(sensor_data_path, 'r') as f:
+        reader = csv.reader(f)
+        raw_header = next(reader)
+        raw_data_rows = list(reader)
+    print(raw_data_rows[0])
+
+    # Step 2: Detect and remove bad field from header
+    if len(raw_data_rows) == 0:
+        raise ValueError("CSV has no data rows")
+
+    first_data_len = len([x for x in raw_data_rows[0] if x.strip() != ""])
+    if len(raw_header) > first_data_len:
+        print(f"Detected extra column in header: {raw_header}")
+
+        headers = [h for h in raw_header if h!="device_id"]
+        data_rows = [row[:-1] for row in raw_data_rows]
+        print(data_rows[0])
+    else:
+        headers = raw_header
+        data_rows = raw_data_rows
+
+    # Step 3: Convert to float DataFrame
+    df = pd.DataFrame(data_rows, columns=headers).astype(float)
+
     data = df.values
-    headers = df.columns.tolist()
     # set the start of timestamps to 0
     data[:, 0] = data[:, 0] - data[0][0]
     timestamps = data[:, 0]
@@ -215,9 +238,32 @@ def extract_labeled_data_from_button_interface(dir_path = None):
     #video_annotation_in_imu_timeline = [(label,start_ts+sync_value,end_ts+sync_value) for (label, start_ts, end_ts) in video_annotation]
 
     # read the data
-    df = pd.read_csv(imu_data_file)
+    # read the data
+    # Step 1: Read raw data using csv.reader
+    with open(imu_data_file, 'r') as f:
+        reader = csv.reader(f)
+        raw_header = next(reader)
+        raw_data_rows = list(reader)
+    print(raw_data_rows[0])
+
+    # Step 2: Detect and remove bad field from header
+    if len(raw_data_rows) == 0:
+        raise ValueError("CSV has no data rows")
+
+    first_data_len = len([x for x in raw_data_rows[0] if x.strip() != ""])
+    if len(raw_header) > first_data_len:
+        print(f"Detected extra column in header: {raw_header}")
+
+        headers = [h for h in raw_header if h!="device_id"]
+        data_rows = [row[:-1] for row in raw_data_rows]
+        print(data_rows[0])
+    else:
+        headers = raw_header
+        data_rows = raw_data_rows
+
+    # Step 3: Convert to float DataFrame
+    df = pd.DataFrame(data_rows, columns=headers).astype(float)
     data = df.values
-    headers = df.columns.tolist()
 
 
     # create data to be saved

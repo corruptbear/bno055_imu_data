@@ -6,7 +6,7 @@ for example, you have a file called `button_imu_logs_250507_230833.zip`
 
 run:
 ```python
-import extract_labeled_data_from_button_interface from extract_with_label
+from extract_with_label import extract_labeled_data_from_button_interface
 extract_labeled_data_from_button_interface("button_imu_logs_250507_230833.zip")
 ```
 the zip file will be unzipped;   
@@ -21,7 +21,7 @@ the zip file will be unzipped;
 - step 2: run the annotator `python3 annotation.py`; load the raw imu data (now the annotator will convert unit automatically if not converted yet), and use the `for_marking_the_start` mask to create a special alignment file
 - step 3: 
    ```python
-   import extract_labeled_data_from_video from extract_with_label
+   from extract_with_label import extract_labeled_data_from_button_interface
    extract_labeled_data_from_video(sensor_data_path="./ble_imu_data_250429_200238_unit_converted.csv", annotation_path="./20250430_030238000_iOS.aucvl")
    ```
    the labeled data will be saved to `ble_imu_data_250429_200238_unit_converted_video_labeled.csv`
