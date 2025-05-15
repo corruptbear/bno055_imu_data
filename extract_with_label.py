@@ -22,10 +22,32 @@ def extract_labeled_data(raw_csv_path):
     # load the alignments
     alignment_offsets = load_yaml(alignment_path)
 
-    # read the data
-    df = pd.read_csv(raw_csv_path)
+    # Step 1: Read raw data using csv.reader
+    with open(raw_csv_path, 'r') as f:
+        reader = csv.reader(f)
+        raw_header = next(reader)
+        raw_data_rows = list(reader)
+    print(raw_data_rows[0])
+
+    # Step 2: Detect and remove bad field from header
+    if len(raw_data_rows) == 0:
+        raise ValueError("CSV has no data rows")
+
+    first_data_len = len([x for x in raw_data_rows[0] if x.strip() != ""])
+    if len(raw_header) > first_data_len:
+        print(f"Detected extra column in header: {raw_header}")
+
+        headers = [h for h in raw_header if h!="device_id"]
+        data_rows = [row[:-1] for row in raw_data_rows]
+        print(data_rows[0])
+    else:
+        headers = raw_header
+        data_rows = raw_data_rows
+
+    # Step 3: Convert to float DataFrame
+    df = pd.DataFrame(data_rows, columns=headers).astype(float)
+
     data = df.values
-    headers = df.columns.tolist()
     # set the start of timestamps to 0
     data[:, 0] = data[:, 0] - data[0][0]
     timestamps = data[:, 0]
@@ -52,11 +74,12 @@ def extract_labeled_data(raw_csv_path):
 
     # Add the new column
     save = np.hstack([save, new_column])
-    new_headers = ','.join(headers+["label"])
-    #print(new_headers)
+    headers = headers+["label"]
+    new_headers = ','.join(headers)
     #new_fmt = formats+["%s"]
     new_fmt = generate_formats(headers)
     new_fmt = new_fmt + ["%s"]
+    print(headers, len(headers),len(new_fmt))
     # TODO:
     np.savetxt(export_path, save, delimiter=',', header=new_headers, comments='', fmt=new_fmt)
 
@@ -261,8 +284,8 @@ if __name__ == "__main__":
     """
 
     # example
-    #extract_labeled_data_from_video(sensor_data_path="./ble_imu_data_250429_200238_unit_converted.csv", annotation_path="./20250430_030238000_iOS.aucvl")
-    extract_labeled_data_from_button_interface("./button_imu_logs_250507_230833.zip")
+    extract_labeled_data_from_video(sensor_data_path="./ble_imu_data_250429_200238_unit_converted.csv", annotation_path="./20250430_030238000_iOS.aucvl")
+    #extract_labeled_data_from_button_interface("./button_imu_logs_250507_230833.zip")
 
     #extract_labeled_data("./pkls/0_mix1.csv")
     #extract_labeled_data("./pkls/0_doremi_acc_partial.csv")

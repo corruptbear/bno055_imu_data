@@ -11,8 +11,10 @@ def update_plot(col):
     plt.draw()
 
 # Load CSVs
-csv_path_labeled = "./button_imu_logs_250507_230833/ble_imu_data_250507_230637_unit_converted_button_labeled.csv"
-csv_path_unlabeled = "./button_imu_logs_250507_230833/ble_imu_data_250507_230637_unit_converted.csv"
+#csv_path_labeled = "./button_imu_logs_250507_230833/ble_imu_data_250507_230637_unit_converted_button_labeled.csv"
+#csv_path_unlabeled = "./button_imu_logs_250507_230833/ble_imu_data_250507_230637_unit_converted.csv"
+csv_path_labeled = "./ble_imu_data_250429_200238_unit_converted_video_labeled.csv"
+csv_path_unlabeled = "./ble_imu_data_250429_200238_unit_converted.csv"
 
 df = pd.read_csv(csv_path_labeled)
 df_unlabeled = pd.read_csv(csv_path_unlabeled)
