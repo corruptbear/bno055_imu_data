@@ -3,6 +3,7 @@ import yaml
 import csv
 import os
 import zipfile
+import pandas as pd
 
 def get_base_name(name):
     # Use a regex to remove the numeric suffix preceded by an underscore
@@ -60,3 +61,16 @@ def infer_formats_csv(csv_path):
     with open(csv_path, mode='r') as f:
         first_non_header_line = f.readlines()[1].strip()
         return infer_formats(first_non_header_line)
+
+def append_person_information(csv_path, person_code):
+    """
+    append personcode if not exist; or modify existing personcode
+    """
+    # Read the CSV file
+    df = pd.read_csv(csv_path)
+
+    # Add a new column named 'person' and fill it with the value 20
+    df['person'] = person_code
+
+    # Optionally, save the updated DataFrame back to a new CSV
+    df.to_csv(csv_path, index=False)
