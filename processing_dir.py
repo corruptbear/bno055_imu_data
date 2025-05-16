@@ -1,8 +1,9 @@
 import glob
 import os
-from extract_with_label import extract_labeled_data_from_button_interface
+from extract_with_label import *
 import re
 from utils import *
+import shutil
 
 def is_already_unzipped(zip_path):
     # Assume the unzipped directory name is derived from the zip file name
@@ -23,6 +24,9 @@ def process_all_button_logs_recursive(root_dir):
         extract_labeled_data_from_button_interface(zip_path)
 
 def find_labeled_csvs_with_top_level_p_index(root_dir):
+    """
+    the participants data is organized as rootdir/p1, rootdir/p2, ...
+    """
     root_dir = os.path.abspath(os.path.expanduser(root_dir))
     labeled_files = glob.glob(os.path.join(root_dir, '**', '*labeled.csv'), recursive=True)
 
@@ -46,9 +50,65 @@ def find_labeled_csvs_with_top_level_p_index(root_dir):
     return result
 
 
+def extract_audio_labels(root_dir):
+    """
+    the participants data is organized as rootdir/p1, rootdir/p2, ...
+    """
+    root_dir = os.path.abspath(os.path.expanduser(root_dir))
+    labeled_files = glob.glob(os.path.join(root_dir, '**','*audio_imu_logs*', '*unit_converted.csv'), recursive=True)
+
+    result = []
+    for path in labeled_files:
+        print("extract_audio_labels\n:",path)
+        extract_labeled_data(path)
+
+    return result
+
+
+#/Users/lws/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_audio
+def copy_audio_labeled_data(root_dir):
+    root_dir = os.path.abspath(os.path.expanduser(root_dir))
+    labeled_files = glob.glob(os.path.join(root_dir, '**', '*converted_labeled.csv'), recursive=True)
+
+    dest_dir = "/Users/lws/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_audio/raw_data"
+    os.makedirs(dest_dir, exist_ok=True)
+
+    for src_path in labeled_files:
+        filename = os.path.basename(src_path)
+        dest_path = os.path.join(dest_dir, filename)
+
+        if os.path.exists(dest_path):
+            print(f"Skipping existing file: {dest_path}")
+            continue
+
+        print(f"copy_audio_labeled_data: Copying {src_path} → {dest_path}")
+        shutil.copy2(src_path, dest_path)
+
+def copy_button_labeled_data(root_dir):
+    root_dir = os.path.abspath(os.path.expanduser(root_dir))
+    labeled_files = glob.glob(os.path.join(root_dir, '**', '*button_labeled.csv'), recursive=True)
+
+    dest_dir = "/Users/lws/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_button/raw_data"
+    os.makedirs(dest_dir, exist_ok=True)
+
+    for src_path in labeled_files:
+        filename = os.path.basename(src_path)
+        dest_path = os.path.join(dest_dir, filename)
+
+        if os.path.exists(dest_path):
+            print(f"Skipping existing file: {dest_path}")
+            continue
+
+        print(f"copy_button_labeled_data: Copying {src_path} → {dest_path}")
+        shutil.copy2(src_path, dest_path)
+
 process_all_button_logs_recursive("~/Downloads/exp_data/")
+extract_audio_labels("~/Downloads/exp_data/")
 
 files_with_p = find_labeled_csvs_with_top_level_p_index("~/Downloads/exp_data/")
 for path, p_num in files_with_p:
     print(f"labeled_csv_path: {path}, p number: {p_num}")
     append_person_information(path, p_num)
+
+copy_audio_labeled_data("~/Downloads/exp_data/")
+copy_button_labeled_data("~/Downloads/exp_data/")

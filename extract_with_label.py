@@ -106,7 +106,18 @@ def convert_video_annotation(annotation_file_path):
     segments.append((events[-1]['label'], events[-1]['time'], events[-1]['time']+0.1))
     return segments
 
+#['standing_still', 'walking_forward', 'running_forward', 'climb_up', 'climb_down']
+"""
+Climbing Down
+Climbing Up
+Nothing
+Running
+Standing
+Walking
+"""
 def convert_button_annotation(log_file_path):
+    label_mapping = {"Climbing Up":"climb_up","Climbing Down":"climb_down","Running":"running_forward","Standing":"standing_still","Walking":"walking_forward","Nothing":"nothing","walk":"walking_forward"}
+
     df = pd.read_csv(log_file_path)
     labels = df['label'].values
     timestamps = df['timestamp'].values
@@ -115,7 +126,7 @@ def convert_button_annotation(log_file_path):
     for i in range(len(df) - 1):
         start = timestamps[i]
         end = timestamps[i + 1]
-        label = labels[i]
+        label = label_mapping[labels[i]]
         segments.append((label, start, end))
     segments.append((labels[-1], timestamps[-1], None))
     return segments
