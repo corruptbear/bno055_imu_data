@@ -273,6 +273,9 @@ class DraggableIntervals:
         self.zoom_interval_spans = []
         self.label_to_color = {}
 
+        if hasattr(self, 'listbox_selected_interval_name'):
+            delattr(self, 'listbox_selected_interval_name')
+
         self.read_data(csv)
         self.master.title(self.csv_path)
 
@@ -295,7 +298,7 @@ class DraggableIntervals:
         self.alignments_listbox.delete(0, tk.END)
         print(self.interval_patches)
         self.load_alignments()
-        print(self.alignment_offsets)
+        print("after loading alignments:", self.alignment_offsets)
         self.annotation_button_click_log = dict()
 
     def load_alignments(self):
@@ -403,7 +406,7 @@ class DraggableIntervals:
         #self.listbox_selected_interval_name = self.dropdown_var.get()
         listbox_selected_interval_name = self.dropdown_var.get()
         #print(f"Selected value from dropdown: {self.listbox_selected_interval_name}")
-        print(f"Selected value from dropdown: {listbox_selected_interval_name}")
+        print(f"Selected value from dropdown: {listbox_selected_interval_name}", self.alignment_offsets)
 
         #load new masks
         #self.load_color_patches(self.listbox_selected_interval_name)
@@ -521,7 +524,7 @@ class DraggableIntervals:
         # only modify alignment offsets if the listbox is selected
         if hasattr(self, 'listbox_selected_interval_name'):
             self.alignment_offsets[self.listbox_selected_interval_name] = offset
-        print("on release",offset)
+        print("on release",offset, self.alignment_offsets)
 
     def on_zoom_press(self, event):
         """
