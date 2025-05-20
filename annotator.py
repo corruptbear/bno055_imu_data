@@ -15,6 +15,31 @@ from collections import defaultdict
 import time
 from datetime import datetime
 
+column_to_unit = {
+    "gyro_x":r'Angular Velocity ($^\circ$/s)',
+    "gyro_y":r'Angular Velocity ($^\circ$/s)',
+    "gyro_z":r'Angular Velocity ($^\circ$/s)',
+    "acc_x":r'Acceleration (m/s$^2$)',
+    "acc_y":r'Acceleration (m/s$^2$)',
+    "acc_z":r'Acceleration (m/s$^2$)',
+    "lacc_x":r'Acceleration (m/s$^2$)',
+    "lacc_y":r'Acceleration (m/s$^2$)',
+    "lacc_z":r'Acceleration (m/s$^2$)',
+    "gravity_x":r'Acceleration (m/s$^2$)',
+    "gravity_y":r'Acceleration (m/s$^2$)',
+    "gravity_z":r'Acceleration (m/s$^2$)',
+    "mag_x":r'Magnetic Field ($\mu$T)',
+    "mag_y":r'Magnetic Field ($\mu$T)',
+    "mag_z":r'Magnetic Field ($\mu$T)',
+    "quat_w":r'$q_w$',
+    "quat_x":r'$q_x$',
+    "quat_y":r'$q_y$',
+    "quat_z":r'$q_z$',
+    "calib_accel":"",
+    "calib_gyro":"",
+    "calib_mag":"",
+    "calib_sys":""
+}
 
 class WrappedLabel(tk.Frame):
     def __init__(self, master, text="", width=200, height=30, bg='white', fg='black', relief='flat', borderwidth=1, command=None, **kwargs):
@@ -58,14 +83,15 @@ labelpad_scale = font_size_scale
 
 plt.rcParams.update({
     'font.size': scaled_font_size,
-    'axes.titlesize': scaled_font_size * 1.2,
-    'axes.labelsize': scaled_font_size,
-    'xtick.labelsize': scaled_font_size * 0.8,
-    'ytick.labelsize': scaled_font_size * 0.8,
-    'legend.fontsize': scaled_font_size * 0.8,  # Adjust the legend font size
+    'axes.titlesize': scaled_font_size * 1.1,
+    'axes.labelsize': scaled_font_size * 0.8,
+    'xtick.labelsize': scaled_font_size * 0.7,
+    'ytick.labelsize': scaled_font_size * 0.7,
+    'legend.fontsize': scaled_font_size * 0.7,  # Adjust the legend font size
     'lines.linewidth': base_linewidth / linewidth_scale,
     'axes.linewidth': 0.15 * (dpi / base_dpi),
-    'figure.dpi':300
+    'figure.dpi':600,
+    'savefig.dpi':600
 })
 
 
@@ -93,7 +119,8 @@ class DraggableIntervals:
     def init_components(self):
         self.fig, (self.ax, self.zoom_ax) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [3, 2]}, figsize=(8, 6), dpi=300)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
-        plt.subplots_adjust(bottom=0.1, hspace=0.4)
+        #plt.subplots_adjust(bottom=0.1, hspace=0.4)
+        plt.subplots_adjust(top=0.92, bottom=0.1, hspace=0.5, right=0.8) 
 
         print("figure DPI",self.fig.get_dpi())
         # Set font sizes and DPI
@@ -110,6 +137,9 @@ class DraggableIntervals:
         # load file button
         self.load_button = Button(self.button_frame, text='Load File', command=self.load_file)
         self.load_button.pack(side='left', padx=5)
+
+        self.save_figure_button = Button(self.button_frame, text='Save Figure', command=self.save_figure)
+        self.save_figure_button.pack(side='left', padx=5)
 
         # Add Tkinter RadioButtons
         self.radio_frame = Frame(self.master)
@@ -238,7 +268,9 @@ class DraggableIntervals:
         grouped = defaultdict(list)
 
         # Group by prefix (before '_')
-        for header in self.headers[1:]:  # Skip 'timestamp'
+        for header in self.headers:  # Skip 'timestamp'
+            if "timestamp" in header:
+                continue
             if '_' in header:
                 prefix, axis = header.split('_', 1)
                 grouped[prefix].append(axis)
@@ -451,7 +483,7 @@ class DraggableIntervals:
             if label not in added_labels:
                 handles.append(Patch(color=self.label_to_color[label], alpha=0.5, label=label, linewidth=0))
                 added_labels.add(label)
-        self.patch_legend = self.ax.legend(handles=handles, prop={'size': plt.rcParams['legend.fontsize']})
+        self.patch_legend = self.ax.legend(handles=handles, prop={'size': plt.rcParams['legend.fontsize']},bbox_to_anchor=(1, 0.5))
         self.patch_legend.get_frame().set_linewidth(0.2)
         self.update_plot()
 
@@ -554,7 +586,8 @@ class DraggableIntervals:
         dx = event.xdata - self.zoom_press
 
         # limit the move range, so that all the spans are contained in the current window
-        if (current_last_patch_end + dx > xmax) or (current_first_patch_start + dx < xmin):
+        #if (current_last_patch_end + dx > xmax) or (current_first_patch_start + dx < xmin):
+        if (current_first_patch_start + dx < xmin):
             return
 
         # Update the patches in the main plot (ax)
@@ -616,6 +649,43 @@ class DraggableIntervals:
         file_path = filedialog.askopenfilename(filetypes=[('csv Files', '*.csv')], initialdir="./example_data")
         if file_path:
             self.set_new_file(file_path)
+    def save_figure(self):
+        """
+        Save the current figure as an image file
+        """
+        # Generate default filename based on the current data file
+        if hasattr(self, 'csv_path'):
+            default_name = os.path.splitext(os.path.basename(self.csv_path))[0] + "_figure"
+        else:
+            default_name = "figure"
+    
+        # Add timestamp to filename to avoid overwrites
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_name = f"{default_name}_{timestamp}"
+    
+        # Open file dialog to let user choose save location and format
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".png",
+            filetypes=[
+                ("PNG files", "*.png"),
+                ("PDF files", "*.pdf"),
+                ("JPEG files", "*.jpg")
+            ],
+            initialfile=default_name
+        )
+    
+        if file_path:
+            try:
+                # Save the figure with high quality
+                self.fig.savefig(
+                    file_path, 
+                    dpi=1000,
+                    bbox_inches='tight',  # This includes the legend in the saved figure
+                    pad_inches=0.1
+                )
+                messagebox.showinfo("Success", f"Figure saved to {file_path}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save figure: {str(e)}")
 
     def update_plot(self):
         """
@@ -631,6 +701,8 @@ class DraggableIntervals:
         #x1 = min(self.interval_patches[-1]['patch'].get_xy()[2][0] + 10, self.timestamps[-1])
 
         self.ax.relim()
+        self.ax.set_xlabel("Time (s)", labelpad=2)
+        self.ax.set_ylabel(column_to_unit[label], labelpad=1)
         self.ax.autoscale_view()
         self.ax.set_xlim(0,self.ax.get_xlim()[1])
         self.canvas.draw()
@@ -645,11 +717,14 @@ class DraggableIntervals:
         x1 = min(self.interval_patches[-1]['patch'].get_xy()[2][0] + 10, self.timestamps[-1])
         zoom_data = self.data[(self.timestamps >= x0) & (self.timestamps <= x1)]
         zoom_y_data = zoom_data[:, self.column_index]
+        x1 = x0+60 #hot apply
 
         self.zoom_ax.clear()  # Clear the entire axis
 
         self.zoom_ax.relim()
         self.zoom_ax.set_xlim(x0, x1)
+        self.zoom_ax.set_xlabel("Time (s)", labelpad=2)
+        self.zoom_ax.set_ylabel(column_to_unit[self.radio_var.get()], labelpad=1)
 
         for span in self.zoom_interval_spans:
             span.remove()
