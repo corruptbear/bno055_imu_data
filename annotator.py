@@ -646,9 +646,21 @@ class DraggableIntervals:
         """
         load another file
         """
-        file_path = filedialog.askopenfilename(filetypes=[('csv Files', '*.csv')], initialdir="./example_data")
+        if not hasattr(self, '_file_dialog_shown_once'):
+            # First time
+            initialdir = "./example_data"
+            self._file_dialog_shown_once = True
+        else:
+                # Subsequent times — let Tkinter remember last visited dir
+            initialdir = None
+
+        file_path = filedialog.askopenfilename(
+            filetypes=[('csv Files', '*.csv')],
+            initialdir=initialdir
+        )
         if file_path:
             self.set_new_file(file_path)
+
     def save_figure(self):
         """
         Save the current figure as an image file
