@@ -5,6 +5,14 @@ import re
 from utils import *
 import shutil
 
+def file_hash(path, chunk_size=8192):
+    """Compute SHA256 hash of a file."""
+    hasher = hashlib.sha256()
+    with open(path, 'rb') as f:
+        while chunk := f.read(chunk_size):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
 def is_already_unzipped(zip_path):
     # Assume the unzipped directory name is derived from the zip file name
     unzip_dir = os.path.splitext(zip_path)[0]  # remove .zip
@@ -96,10 +104,13 @@ def copy_button_labeled_data(root_dir):
         dest_path = os.path.join(dest_dir, filename)
 
         if os.path.exists(dest_path):
-            print(f"Skipping existing file: {dest_path}")
-            continue
-
-        print(f"copy_button_labeled_data: Copying {src_path} → {dest_path}")
+            if file_hash(src_path) == file_hash(dest_path):
+                print(f"Skipping identical file: {dest_path}")
+                continue
+            else:
+                print(f"Overwriting different file: {dest_path}")
+    
+        print(f"Copying {src_path} → {dest_path}")
         shutil.copy2(src_path, dest_path)
 
 process_all_button_logs_recursive("~/Downloads/exp_data/")
