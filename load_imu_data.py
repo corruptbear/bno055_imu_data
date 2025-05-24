@@ -152,9 +152,9 @@ def load_tag_imu_data_from_csv(filename):
     """
 
     df = pd.read_csv(filename)
-
-    df["timestamp"] = df["timestamp"] / 1000.0
-    df["android_nano_timestamp"] = df["android_nano_timestamp"] / 1e9
+    if "android_nano_timestamp" in df.columns:
+        df["timestamp"] = df["timestamp"] / 1000.0
+        df["android_nano_timestamp"] = df["android_nano_timestamp"] / 1e9
     df["acc_x"], df["acc_y"],df["acc_z"] = df["acc_x"]/ACC_SCALE_FACTOR, df["acc_y"]/ACC_SCALE_FACTOR,df["acc_z"]/ACC_SCALE_FACTOR
     df["lacc_x"], df["lacc_y"],df["lacc_z"] = df["lacc_x"]/LACC_SCALE_FACTOR, df["lacc_y"]/LACC_SCALE_FACTOR,df["lacc_z"]/LACC_SCALE_FACTOR
     df["gyro_x"], df["gyro_y"],df["gyro_z"] = df["gyro_x"]/GYRO_SCALE_FACTOR, df["gyro_y"]/GYRO_SCALE_FACTOR,df["gyro_z"]/GYRO_SCALE_FACTOR

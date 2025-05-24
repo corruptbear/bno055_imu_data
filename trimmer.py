@@ -361,7 +361,7 @@ if __name__ == "__main__":
     root.title("Time Series Manager")
 
     # Create and display the TimeSeriesSpanManager
-    manager = TimeSeriesSpanManager(root, csv="./pkls/0_mix1.csv")
+    manager = TimeSeriesSpanManager(root, csv="./pkls/0_mix1_unit_converted.csv")
 
     # Start the Tkinter main loop
     root.mainloop()
