@@ -13,6 +13,69 @@ from intervals import all_intervals
 from utils import *
 from load_imu_data import load_tag_imu_data_from_csv
 
+def test_offset_extract_labeled_data(raw_csv_path, interval_name, dst_dir):
+    #metronome_padded_bpm60
+    base, ext = os.path.splitext(os.path.basename(raw_csv_path))
+    dst_dir = os.path.expanduser(dst_dir)
+
+    # Read raw data
+    with open(raw_csv_path, 'r') as f:
+        reader = csv.reader(f)
+        raw_header = next(reader)
+        raw_data_rows = list(reader)
+
+    if len(raw_data_rows) == 0:
+        raise ValueError("CSV has no data rows")
+
+    first_data_len = len([x for x in raw_data_rows[0] if x.strip() != ""])
+    if len(raw_header) > first_data_len:
+        headers = [h for h in raw_header if h != "device_id"]
+        data_rows = [row[:-1] for row in raw_data_rows]
+    else:
+        headers = raw_header
+        data_rows = raw_data_rows
+
+    df = pd.DataFrame(data_rows, columns=headers).astype(float)
+    data = df.values
+    data[:, 0] = data[:, 0] - data[0][0]  # Normalize timestamps to start at 0
+
+    formats = generate_formats(headers) + ["%s"]
+    headers.append("label")
+    header_line = ','.join(headers)
+
+    for i in range(-100, 100, 10): 
+        fractional_offset = i / 100.0
+        save = np.empty((0, data.shape[1]), dtype=object)
+        labels = []
+
+        offset = fractional_offset
+        current_interval = [
+            (x, y, z) for (x, y, z) in all_intervals[interval_name] if "ready" not in x
+        ]
+        for label, start, end in current_interval:
+            start_ts, end_ts = start + offset, end + offset
+            selected = [row for row in data if start_ts <= row[0] <= end_ts]
+            labels.extend([label] * len(selected))
+            if selected:
+                save = np.vstack([save, selected])
+
+
+        new_column = np.array(labels).reshape(-1, 1)
+        save = np.hstack([save, new_column])
+
+        sign = 'm' if i < 0 else 'p'
+        suffix = f"{sign}{abs(i):02d}"
+        # Create subfolder with subsubfolder called raw_data
+        subfolder_path = os.path.join(dst_dir, suffix, "raw_data")
+        os.makedirs(subfolder_path, exist_ok=True)
+
+        output_filename = f"{base}_labeled_offset_{suffix}.csv"
+        output_path = os.path.join(subfolder_path, output_filename)
+
+        np.savetxt(output_path, save, delimiter=',', header=header_line, comments='', fmt=formats)
+        print(f"Saved: {output_path}")
+    
+
 
 def extract_labeled_data(raw_csv_path):
     base, ext = os.path.splitext(raw_csv_path)
@@ -341,8 +404,12 @@ if __name__ == "__main__":
     """
 
     # example
-    extract_labeled_data_from_video(sensor_data_path="./ble_imu_data_250429_200238_unit_converted.csv", annotation_path="./20250430_030238000_iOS.aucvl")
+    #extract_labeled_data_from_video(sensor_data_path="./ble_imu_data_250429_200238_unit_converted.csv", annotation_path="./20250430_030238000_iOS.aucvl")
+    #test_offset_extract_labeled_data("ble_imu_data_250516_115403_unit_converted.csv", "metronome_padded_bpm60", "~/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_sliding")
     #extract_labeled_data_from_button_interface("./button_imu_logs_250507_230833.zip")
+
+    test_offset_extract_labeled_data("ble_imu_data_250520_161721_unit_converted.csv", "metronome_padded_bpm60", "~/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_sliding_gabe")
+
 
     #extract_labeled_data("./pkls/0_mix1.csv")
     #extract_labeled_data("./pkls/0_doremi_acc_partial.csv")
