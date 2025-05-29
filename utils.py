@@ -74,3 +74,21 @@ def append_person_information(csv_path, person_code):
 
     # Optionally, save the updated DataFrame back to a new CSV
     df.to_csv(csv_path, index=False)
+
+def estimate_sampling_rate(csv_path):
+    # Read as DataFrame
+    df = pd.read_csv(csv_path)
+
+    # Use second column (index 1) as timestamp
+    timestamps = df["timestamp"]
+
+    # Duration in seconds
+    total_duration = timestamps.iloc[-1] - timestamps.iloc[0]
+
+    # Number of samples
+    num_samples = len(timestamps)
+
+    # Sampling rate = samples / seconds
+    sampling_rate = num_samples / total_duration
+
+    return sampling_rate

@@ -31,5 +31,6 @@ def show_usable_data_time():
         usable_intervals = [z-y for (x, y, z) in all_intervals[interval] if (x not in ["moving","stop"]) and ("ready" not in x)]
         print(interval, len(usable_intervals), sum(usable_intervals))
 
-show_usable_data_time()
+if __name__ == "__main__":
+    show_usable_data_time()
 

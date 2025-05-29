@@ -408,7 +408,10 @@ if __name__ == "__main__":
     #test_offset_extract_labeled_data("ble_imu_data_250516_115403_unit_converted.csv", "metronome_padded_bpm60", "~/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_sliding")
     #extract_labeled_data_from_button_interface("./button_imu_logs_250507_230833.zip")
 
-    test_offset_extract_labeled_data("ble_imu_data_250520_161721_unit_converted.csv", "metronome_padded_bpm60", "~/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_sliding_gabe")
+    #test_offset_extract_labeled_data("ble_imu_data_250520_161721_unit_converted.csv", "metronome_padded_bpm60", "~/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_sliding_gabe")
+    
+    test_offset_extract_labeled_data("/Users/lws/Downloads/exp_data/p0/metronome_padded_bpm60_audio_imu_logs_250525_171126/ble_imu_data_250525_170412_unit_converted.csv", "metronome_padded_bpm60", "~/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_sliding_jonathan")
+    
 
 
     #extract_labeled_data("./pkls/0_mix1.csv")
