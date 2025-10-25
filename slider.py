@@ -108,6 +108,7 @@ class DraggableIntervals:
         self.fig, (self.ax, self.zoom_ax) = plt.subplots(
             2, 1, gridspec_kw={'height_ratios': [3, 2]}, figsize=(8, 6), dpi=300
         )
+        self.main_zoom_span = None
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
         plt.subplots_adjust(top=0.92, bottom=0.1, hspace=0.5, right=0.8)
         self.set_font_sizes(dpi=300)
@@ -322,7 +323,7 @@ class DraggableIntervals:
             if label not in self.label_to_color:
                 self.label_to_color[label] = colormap(len(self.label_to_color) % colormap.N)
             color = self.label_to_color[label]
-            patch = self.ax.axvspan(start+offset, end+offset, color=color, alpha=0.5, label=label, linewidth=0)
+            patch = self.ax.axvspan(start+offset, end+offset, color=color, alpha=0.5, label=label, linewidth=0, zorder=2)
             self.interval_patches.append({'patch': patch, 'label': label, 'color': color, 'limits': (start, end)})
 
         handles, added = [], set()
@@ -399,6 +400,19 @@ class DraggableIntervals:
 
         if not self.zoom_dragging:
             self.zoom_press = None
+
+    def _update_main_zoom_highlight(self, x0, x1):
+        """Show the current zoom window [x0, x1] as a gray band on the main axis."""
+        # Remove and recreate is simplest & robust with blended transforms
+        try:
+            if self.main_zoom_span is not None:
+                self.main_zoom_span.remove()
+        except Exception:
+            pass
+        # Light gray band, behind masks & line
+        self.main_zoom_span = self.ax.axvspan(
+            x0, x1, color='0.85', alpha=1, linewidth=0, zorder=0
+        )
 
     def on_zoom_motion(self, event):
         if not self.zoom_dragging or self.zoom_press is None or event.inaxes != self.zoom_ax:
@@ -587,6 +601,9 @@ class DraggableIntervals:
 
         if zoom_data.size:
             self.zoom_ax.plot(zoom_data[:, 0], zoom_y_data, 'r-')
+
+        # Keep the gray window in main axis synced with current zoom limits
+        self._update_main_zoom_highlight(x0, x1)
 
         self.ax.figure.canvas.draw()
 
