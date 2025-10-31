@@ -14,6 +14,7 @@ from extract_with_label import extract_labeled_data
 from collections import defaultdict
 import time
 from datetime import datetime
+import re
 
 column_to_unit = {
     "gyro_x":r'Angular Velocity ($^\circ$/s)',
@@ -25,6 +26,8 @@ column_to_unit = {
     "lacc_x":r'Acceleration (m/s$^2$)',
     "lacc_y":r'Acceleration (m/s$^2$)',
     "lacc_z":r'Acceleration (m/s$^2$)',
+    "acc_e": r'Acceleration (m/s$^2$)',
+    "lacc_e": r'Acceleration (m/s$^2$)',
     "gravity_x":r'Acceleration (m/s$^2$)',
     "gravity_y":r'Acceleration (m/s$^2$)',
     "gravity_z":r'Acceleration (m/s$^2$)',
@@ -163,15 +166,28 @@ class DraggableIntervals:
         self.export_path = base + "_labeled.csv"
 
         df = pd.read_csv(self.csv_path)
+
+        # --- add vector-magnitude channels once ---
+        def _add_energy(df_, prefix):
+            cols = [f"{prefix}_x", f"{prefix}_y", f"{prefix}_z"]
+            ecol = f"{prefix}_e"
+            if all(c in df_.columns for c in cols) and ecol not in df_.columns:
+                v = df_[cols].to_numpy(dtype=float)  # shape [T,3]
+                df_[ecol] = np.sqrt((v ** 2).sum(axis=1))
+
+        _add_energy(df, "acc")
+        _add_energy(df, "lacc")
+
         all_data = df.values
         all_data[:, 0] = all_data[:, 0] - all_data[0][0]
         self.data = all_data
         self.timestamps = all_data[:, 0]
         self.headers = df.columns.tolist()
-        if "gyro_x" in df.columns: self.column_index = df.columns.get_loc("gyro_x")
+        if "acc_z" in df.columns: self.column_index = df.columns.get_loc("acc_z")
         elif "lacc_x" in df.columns: self.column_index = df.columns.get_loc("lacc_x")
         elif "quat_x" in df.columns: self.column_index = df.columns.get_loc("quat_x")
         else: self.column_index = 5
+
 
     def reset_radio_buttons(self):
         for widget in self.radio_frame.winfo_children():
@@ -192,6 +208,7 @@ class DraggableIntervals:
                 rb = Radiobutton(row, text=axis, variable=self.radio_var, value=full_name, command=self.update_plot)
                 rb.pack(side='left', padx=5)
                 self.radio_buttons.append(rb)
+
 
     def set_new_file(self, csv):
         if not csv.endswith("_unit_converted.csv"):
@@ -505,13 +522,92 @@ class DraggableIntervals:
     def on_export_button_press(self):
         extract_labeled_data(self.csv_path)
 
+    def _maybe_set_dropdown_from_parent(self, csv_path):
+        """
+        Use the CSV's parent dir name to set dropdown to the FULL prefix:
+          <prefix>_bpm<digits>_audio_imu_logs_<YYMMDD>_<HHMMSS>
+        -> dropdown := <prefix>_bpm<digits>  (includes bpm digits)
+        If that exact key exists in all_intervals, select it and load patches.
+        Otherwise, try a case-insensitive match across all_intervals keys.
+        """
+        parent = os.path.basename(os.path.dirname(csv_path))
+        # e.g., roman_ii_padded_bpm120_audio_imu_logs_251028_205806
+        m = re.match(r'^(?P<prefix>.+_bpm\d+)_audio_imu_logs_\d{6}_\d{6}$', parent)
+        if not m:
+            return
+
+        full_prefix = m.group('prefix')  # includes _bpm<digits>, exactly as requested
+
+        # Exact match first
+        if full_prefix in all_intervals:
+            self.dropdown_var.set(full_prefix)
+            self.load_color_patches(full_prefix)
+            return
+
+        # Case-insensitive fallback (helps when folder uses different case)
+        lower_map = {k.lower(): k for k in all_intervals.keys()}
+        key_ci = lower_map.get(full_prefix.lower())
+        if key_ci:
+            self.dropdown_var.set(key_ci)
+            self.load_color_patches(key_ci)
+
     def load_file(self):
+        """
+        cannot choose folder yet
+        """
+        # Prefer showing a file picker; if canceled, fall back to a folder picker.
         if not hasattr(self, '_file_dialog_shown_once'):
-            initialdir = "./example_data"; self._file_dialog_shown_once = True
+            initialdir = "./example_data"
+            self._file_dialog_shown_once = True
         else:
             initialdir = None
-        file_path = filedialog.askopenfilename(filetypes=[('csv Files', '*.csv')], initialdir=initialdir)
-        if file_path: self.set_new_file(file_path)
+
+        # 1) Try selecting a CSV directly
+        file_path = filedialog.askopenfilename(
+            filetypes=[('csv Files', '*.csv')],
+            initialdir=initialdir
+        )
+
+        if file_path:
+            # If the user chose a CSV, load it
+            self.set_new_file(file_path)
+            # If its parent dir matches ..._bpm<digits>_audio_imu_logs_YYMMDD_HHMMSS,
+            # use that prefix to set dropdown & load patches (when present).
+            self._maybe_set_dropdown_from_parent(file_path)
+            return
+
+        # 2) If no file was chosen, allow picking a folder that contains ble_imu_data*.csv
+        dir_path = filedialog.askdirectory(initialdir=initialdir)
+        if not dir_path:
+            return  # user canceled both dialogs
+
+        # Find a CSV in the folder that begins with 'ble_imu_data'
+        candidates = []
+        for name in os.listdir(dir_path):
+            if not name.lower().endswith(".csv"):
+                continue
+            if name.startswith("ble_imu_data"):
+                full = os.path.join(dir_path, name)
+                try:
+                    mtime = os.path.getmtime(full)
+                except Exception:
+                    mtime = 0
+                candidates.append((mtime, full))
+
+        if not candidates:
+            messagebox.showwarning(
+                "No CSV found",
+                "The selected folder does not contain a CSV named like 'ble_imu_data*.csv'."
+            )
+            return
+
+        # Choose the most recently modified matching CSV
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        chosen_csv = candidates[0][1]
+        self.set_new_file(chosen_csv)
+
+        # Optional: also honor the parent rule for folders (parent is the folder you picked)
+        self._maybe_set_dropdown_from_parent(chosen_csv)
 
     def save_figure(self):
         default_name = os.path.splitext(os.path.basename(self.csv_path))[0] + "_figure" if hasattr(self, 'csv_path') else "figure"
