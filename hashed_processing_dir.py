@@ -266,6 +266,52 @@ def copy_button_labeled_data(root_dir):
         shutil.copy2(src_path, dest_path)
 
 # =========================
+# Prune files that exist only in dest_dir
+# =========================
+def prune_orphan_files(dest_dir, valid_basenames, dry_run=True):
+    """
+    Remove files in dest_dir whose base names are NOT present in valid_basenames.
+    - valid_basenames: a set of file base names (e.g., {'a.csv', 'b.csv'})
+    - dry_run: if True, only print what would be deleted
+    """
+    dest_dir = os.path.abspath(os.path.expanduser(dest_dir))
+    if not os.path.isdir(dest_dir):
+        print(f"[prune] dest_dir does not exist: {dest_dir}")
+        return
+
+    deletions = 0
+    kept = 0
+    for entry in os.listdir(dest_dir):
+        path = os.path.join(dest_dir, entry)
+        if not os.path.isfile(path):
+            continue  # ignore subdirs
+        if entry not in valid_basenames:
+            if dry_run:
+                print(f"[prune][DRY] Would delete: {path}")
+            else:
+                try:
+                    os.remove(path)
+                    print(f"[prune] Deleted: {path}")
+                    deletions += 1
+                except Exception as e:
+                    print(f"[prune][error] Could not delete {path}: {e}")
+        else:
+            kept += 1
+
+    print(f"[prune] kept={kept}, {'would_delete' if dry_run else 'deleted'}={deletions}")
+
+def prune_audio_dest(root_dir, dest_dir="/Users/lws/Dev/lab_projects/tottag_ranging/ml-model-sandbox/python/datasets_audio/raw_data", dry_run=True):
+    """
+    Build the set of expected audio labeled basenames from root_dir, then
+    remove extra files in dest_dir that are not in that set.
+    """
+    root_dir = os.path.abspath(os.path.expanduser(root_dir))
+    pattern = os.path.join(root_dir, '**', '*converted_labeled.csv')  # must match copy_audio_labeled_data
+    source_files = glob.glob(pattern, recursive=True)
+    valid_basenames = {os.path.basename(p) for p in source_files}
+    print(f"[prune-audio] source candidates={len(source_files)}, unique basenames={len(valid_basenames)}")
+    prune_orphan_files(dest_dir, valid_basenames, dry_run=dry_run)
+# =========================
 # Run
 # =========================
 if __name__ == "__main__":
@@ -277,4 +323,8 @@ if __name__ == "__main__":
     process_person_information_for_all(DATA_ROOT)
 
     copy_audio_labeled_data(DATA_ROOT)
+
+    #remove files that are deleted from source folder
+    prune_audio_dest(DATA_ROOT, dry_run=False)   # set to False to actually delete
+
     # copy_button_labeled_data(DATA_ROOT)
