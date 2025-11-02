@@ -14,6 +14,9 @@ from utils import *
 from load_imu_data import load_tag_imu_data_from_csv
 
 def test_offset_extract_labeled_data(raw_csv_path, interval_name, dst_dir):
+    """
+    varying offsets
+    """
     #metronome_padded_bpm60
     base, ext = os.path.splitext(os.path.basename(raw_csv_path))
     dst_dir = os.path.expanduser(dst_dir)
@@ -77,13 +80,14 @@ def test_offset_extract_labeled_data(raw_csv_path, interval_name, dst_dir):
     
 
 
-def extract_labeled_data(raw_csv_path):
+def extract_labeled_data(raw_csv_path, alignment_offsets=None):
     base, ext = os.path.splitext(raw_csv_path)
     alignment_path = base + '_alignment.yaml'
     export_path = base + "_labeled.csv"
 
     # load the alignments
-    alignment_offsets = load_yaml(alignment_path)
+    if alignment_offsets is None:
+        alignment_offsets = load_yaml(alignment_path)
 
     # Step 1: Read raw data using csv.reader
     with open(raw_csv_path, 'r') as f:
